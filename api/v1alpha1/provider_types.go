@@ -20,7 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // ProviderSpec defines the desired state of Provider
@@ -28,14 +27,41 @@ type ProviderSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Provider. Edit provider_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Name is the name of the provider we want to create.
+	//+kubebuilder:validation:Required
+	//+kubebuilder:validation:Enum:=Cloudflare
+	Name string `json:"name"`
+
+	// SecretName is the name of the secret that holds the provider specific configuration.
+	// Each provider has its own configuration that is stored in a secret.
+	// Providers:
+	// - Cloudflare: The secret should have the following keys:
+	//   - apiToken: The Cloudflare API token.
+	//+kubebuilder:validation:Required
+	SecretName string `json:"secretName"`
+
+	// Config holds the provider specific configuration.
+	//+kubebuilder:validation:Required
+	Config map[string]string `json:"config"`
 }
 
 // ProviderStatus defines the observed state of Provider
 type ProviderStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// Hold provider specific configuration such as API keys, tokens, etc. that were extracted from the secret
+	Config map[string]string `json:"config,omitempty"`
+
+	// Represents the observations of a Provider's current state.
+	// Provider.status.conditions.type are: "Available" and "Progressing"
+	// Provider.status.conditions.status are one of True, False, Unknown.
+	// Provider.status.conditions.reason the value should be a CamelCase string and producers of specific
+	// condition types may define expected values and meanings for this field, and whether the values
+	// are considered a guaranteed API.
+	// Memcached.status.conditions.Message is a human readable message indicating details about the transition.
+	// For further information see: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +kubebuilder:object:root=true

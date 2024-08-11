@@ -39,9 +39,19 @@ spec:
           spec:
             description: ProviderSpec defines the desired state of Provider
             properties:
-              foo:
-                description: Foo is an example field of Provider. Edit provider_types.go
-                  to remove/update
+              config:
+                additionalProperties:
+                  type: string
+                description: |-
+                  Config holds the provider specific configuration
+                  `None` is used for testing purposes
+                enum:
+                - Cloudflare
+                - None
+                type: object
+              name:
+                description: Name is the name of the provider we want to create. Possible
+                  values are
                 type: string
             type: object
           status:

@@ -1,0 +1,9 @@
+apiVersion: ddns.stefangenov.site/v1alpha1
+kind: Notifier
+metadata:
+  labels:
+    app.kubernetes.io/name: go-ddns-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: notifier-sample
+spec:
+  # TODO(user): Add fields here

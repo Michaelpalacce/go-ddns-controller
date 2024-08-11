@@ -1,4 +1,5 @@
 ## Append samples of your project ##
 resources:
 - ddns_v1alpha1_provider.yaml
+- ddns_v1alpha1_notifier.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
