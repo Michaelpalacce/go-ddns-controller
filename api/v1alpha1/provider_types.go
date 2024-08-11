@@ -59,7 +59,7 @@ type ProviderStatus struct {
 	// Provider.status.conditions.reason the value should be a CamelCase string and producers of specific
 	// condition types may define expected values and meanings for this field, and whether the values
 	// are considered a guaranteed API.
-	// Memcached.status.conditions.Message is a human readable message indicating details about the transition.
+	// Provider.status.conditions.Message is a human readable message indicating details about the transition.
 	// For further information see: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
