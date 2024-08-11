@@ -18,8 +18,12 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -27,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
+	providerConditions "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/provider/conditions"
 )
 
 // ProviderReconciler reconciles a Provider object
@@ -64,7 +69,39 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	secret := &corev1.Secret{}
 	if err := r.Get(ctx, types.NamespacedName{Name: provider.Spec.SecretName, Namespace: req.Namespace}, secret); err != nil {
 		log.Error(err, "unable to fetch Secret", "secret", provider.Spec.SecretName)
+
+		cannotFindSecretCondition := metav1.Condition{
+			Type:               providerConditions.SecretConditionType,
+			Status:             metav1.ConditionFalse,
+			Reason:             providerConditions.SecretFound,
+			Message:            err.Error(),
+			ObservedGeneration: provider.GetGeneration(),
+		}
+
+		meta.SetStatusCondition(&provider.Status.Conditions, cannotFindSecretCondition)
+
+		if statusErr := r.Status().Update(ctx, provider); statusErr != nil {
+			log.Error(statusErr, "unable to update Provider status")
+			return ctrl.Result{}, statusErr
+		}
+
 		return ctrl.Result{}, err
+	} else {
+
+		foundSecretCondition := metav1.Condition{
+			Type:               providerConditions.SecretConditionType,
+			Status:             metav1.ConditionTrue,
+			Reason:             providerConditions.SecretFound,
+			Message:            fmt.Sprintf("Secret %s found in namespace %s", provider.Spec.SecretName, req.Namespace),
+			ObservedGeneration: provider.GetGeneration(),
+		}
+
+		meta.SetStatusCondition(&provider.Status.Conditions, foundSecretCondition)
+
+		if statusErr := r.Status().Update(ctx, provider); statusErr != nil {
+			log.Error(statusErr, "unable to update Provider status")
+			return ctrl.Result{}, statusErr
+		}
 	}
 
 	log.Info("Secret fetched", "secret", secret.Data)
