@@ -19,7 +19,9 @@ package controller
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -47,9 +49,25 @@ type ProviderReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.4/pkg/reconcile
 func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	log.Info("Reconciling Provider")
+
+	provider := &ddnsv1alpha1.Provider{}
+	if err := r.Get(ctx, req.NamespacedName, provider); err != nil {
+		log.Error(err, "unable to fetch Provider, skipping")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	log.Info("Provider fetched", "provider", provider.Spec)
+
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, types.NamespacedName{Name: provider.Spec.SecretName, Namespace: req.Namespace}, secret); err != nil {
+		log.Error(err, "unable to fetch Secret", "secret", provider.Spec.SecretName)
+		return ctrl.Result{}, err
+	}
+
+	log.Info("Secret fetched", "secret", secret.Data)
 
 	return ctrl.Result{}, nil
 }
