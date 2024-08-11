@@ -7,6 +7,32 @@ rules:
 - apiGroups:
   - ddns.stefangenov.site
   resources:
+  - notifiers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
+  - notifiers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
+  - notifiers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
   - providers
   verbs:
   - create
