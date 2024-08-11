@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -208,10 +207,14 @@ func (r *ProviderReconciler) FetchClient(
 		return nil, err
 	}
 
+	log.Info("Secret fetched")
+
 	configMap, err := r.FetchConfig(ctx, req, provider, log)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Info("ConfigMap fetched", "configMap", configMap)
 
 	client, err := r.CreateClient(provider.Spec.Name, secret, configMap, log)
 	if err != nil {
@@ -233,6 +236,10 @@ func (r *ProviderReconciler) CreateClient(
 	case clients.Cloudflare:
 		var cloudflareConfig clients.CloudflareConfig
 
+		if configMap.Data["config"] == "" {
+			return nil, fmt.Errorf("`config` not found in configMap")
+		}
+
 		configMap := configMap.Data["config"]
 
 		err := json.Unmarshal([]byte(configMap), &cloudflareConfig)
@@ -244,12 +251,7 @@ func (r *ProviderReconciler) CreateClient(
 			return nil, fmt.Errorf("`apiToken` not found in secret")
 		}
 
-		data, err := base64.StdEncoding.DecodeString(string(secret.Data["apiToken"]))
-		if err != nil {
-			return nil, fmt.Errorf("could not decode the apiToken: %s", err)
-		}
-
-		client, err = clients.NewCloudflareClient(cloudflareConfig, string(data), log)
+		client, err = clients.NewCloudflareClient(cloudflareConfig, string(secret.Data["apiToken"]), log)
 		if err != nil {
 			return nil, fmt.Errorf("could not create a Cloudflare client: %s", err)
 		}
