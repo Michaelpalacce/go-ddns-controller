@@ -36,6 +36,7 @@ import (
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
 	providerConditions "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/provider/conditions"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/clients"
+	"github.com/Michaelpalacce/go-ddns-controller/internal/network"
 )
 
 // ProviderReconciler reconciles a Provider object
@@ -101,7 +102,29 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
-	fmt.Println("Provider: ", providerClient.GetIp())
+	publicIp, err := r.FetchPublicIp(ctx, req, provider, log)
+	if err != nil {
+		log.Error(err, "unable to fetch public IP")
+		return ctrl.Result{}, err
+	}
+
+	if provider.Status.PublicIP != publicIp {
+		log.Info("Public IP changed", "old", provider.Status.PublicIP, "new", publicIp)
+		provider.Status.PublicIP = publicIp
+	}
+
+	providerIp := providerClient.GetIp()
+
+	if provider.Status.PublicIP != providerIp {
+		log.Info("IP Missmatch", "publicIP", provider.Status.PublicIP, "providerIP", providerIp)
+		providerClient.SetIp(provider.Status.PublicIP)
+		provider.Status.ProviderIP = provider.Status.PublicIP
+	}
+
+	if err := r.Status().Update(ctx, provider); err != nil {
+		log.Error(err, "unable to update Provider status")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{
 		Requeue:      true,
@@ -114,6 +137,46 @@ func (r *ProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&ddnsv1alpha1.Provider{}).
 		Complete(r)
+}
+
+// FetchPublicIp will fetch the public IP of the machine that is running goip
+// it will also update the status of the Provider so logic is isolated in this function
+func (r *ProviderReconciler) FetchPublicIp(
+	ctx context.Context,
+	req ctrl.Request,
+	provider *ddnsv1alpha1.Provider,
+	log logr.Logger,
+) (string, error) {
+	var (
+		message string
+		status  metav1.ConditionStatus
+	)
+
+	ip, err := network.GetPublicIp()
+
+	if err != nil {
+		message = fmt.Sprintf("error while trying to fetch public IP: %s", err)
+		status = metav1.ConditionFalse
+	} else {
+		message = fmt.Sprintf("Public IP fetched: %s", ip)
+		status = metav1.ConditionTrue
+	}
+
+	condition := metav1.Condition{
+		Type:               providerConditions.PublicIpConditionType,
+		Reason:             providerConditions.PublicIpFetched,
+		Message:            message,
+		Status:             status,
+		ObservedGeneration: provider.GetGeneration(),
+	}
+
+	meta.SetStatusCondition(&provider.Status.Conditions, condition)
+
+	if statusErr := r.Status().Update(ctx, provider); statusErr != nil {
+		log.Error(statusErr, "unable to update Provider status", "condition", condition)
+	}
+
+	return ip, err
 }
 
 // FetchSecret will fetch the secret from the namespace and set the status of the Provider
@@ -133,8 +196,6 @@ func (r *ProviderReconciler) FetchSecret(
 
 	secret = &corev1.Secret{}
 	if err = r.Get(ctx, types.NamespacedName{Name: provider.Spec.SecretName, Namespace: req.Namespace}, secret); err != nil {
-		fmt.Println("Error: ", err)
-
 		message = fmt.Sprintf("Secret %s not found", provider.Spec.SecretName)
 		status = metav1.ConditionFalse
 	} else {

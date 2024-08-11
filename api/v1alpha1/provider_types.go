@@ -45,9 +45,11 @@ type ProviderSpec struct {
 
 // ProviderStatus defines the observed state of Provider
 type ProviderStatus struct {
-	// Hold provider specific configuration such as API keys, tokens, etc. that were extracted from the secret
-	// @TODO: This may not be needed
-	Config map[string]string `json:"config,omitempty"`
+	// ProviderIP is the IP address that the provider has set.
+	ProviderIP string `json:"providerIP,omitempty"`
+
+	// PublicIP is your public IP address.
+	PublicIP string `json:"publicIP,omitempty"`
 
 	// Represents the observations of a Provider's current state.
 	// Provider.status.conditions.type are: "Available" and "Progressing"

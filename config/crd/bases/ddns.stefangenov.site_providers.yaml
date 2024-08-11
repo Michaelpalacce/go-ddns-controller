@@ -142,13 +142,12 @@ spec:
                   - type
                   type: object
                 type: array
-              config:
-                additionalProperties:
-                  type: string
-                description: |-
-                  Hold provider specific configuration such as API keys, tokens, etc. that were extracted from the secret
-                  @TODO: This may not be needed
-                type: object
+              providerIP:
+                description: ProviderIP is the IP address that the provider has set.
+                type: string
+              publicIP:
+                description: PublicIP is your public IP address.
+                type: string
             type: object
         type: object
     served: true
