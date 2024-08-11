@@ -22,9 +22,6 @@ import (
 
 // NotifierSpec defines the desired state of Notifier
 type NotifierSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Name is the name of the notifier we want to create.
 	//+kubebuilder:validation:Required
 	//+kubebuilder:validation:Enum:=Webhook
@@ -45,9 +42,6 @@ type NotifierSpec struct {
 
 // NotifierStatus defines the observed state of Notifier
 type NotifierStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Hold notifier specific configuration such as API keys, tokens, etc. that were extracted from the secret
 	Config map[string]string `json:"config,omitempty"`
 

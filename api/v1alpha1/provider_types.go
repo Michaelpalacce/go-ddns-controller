@@ -45,9 +45,6 @@ type ProviderSpec struct {
 
 // ProviderStatus defines the observed state of Provider
 type ProviderStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
 	// Hold provider specific configuration such as API keys, tokens, etc. that were extracted from the secret
 	Config map[string]string `json:"config,omitempty"`
 
