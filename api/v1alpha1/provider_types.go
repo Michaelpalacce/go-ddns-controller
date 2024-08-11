@@ -38,9 +38,9 @@ type ProviderSpec struct {
 	//+kubebuilder:validation:Required
 	SecretName string `json:"secretName"`
 
-	// Config holds the provider specific configuration.
+	// ConfigMap is the name of the config map that holds the provider specific configuration.
 	//+kubebuilder:validation:Required
-	Config map[string]string `json:"config"`
+	ConfigMap string `json:"config"`
 }
 
 // ProviderStatus defines the observed state of Provider

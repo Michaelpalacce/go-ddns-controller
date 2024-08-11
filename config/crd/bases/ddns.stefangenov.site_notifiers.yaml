@@ -40,10 +40,9 @@ spec:
             description: NotifierSpec defines the desired state of Notifier
             properties:
               config:
-                additionalProperties:
-                  type: string
-                description: Config holds the provider specific configuration.
-                type: object
+                description: ConfigMap is the name of the config map that holds the
+                  provider specific configuration.
+                type: string
               name:
                 description: Name is the name of the notifier we want to create.
                 enum:
