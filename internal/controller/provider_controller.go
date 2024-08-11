@@ -64,44 +64,6 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	log.Info("Provider fetched", "provider", provider.Spec)
 
-	providerClient, err := r.FetchClient(ctx, req, provider, log)
-
-	if err != nil {
-		log.Error(err, "unable to create client")
-
-		condition := metav1.Condition{
-			Type:               providerConditions.ClientCreatedConditionType,
-			Reason:             providerConditions.ClientCreated,
-			ObservedGeneration: provider.GetGeneration(),
-			Message:            err.Error(),
-			Status:             metav1.ConditionFalse,
-		}
-
-		meta.SetStatusCondition(&provider.Status.Conditions, condition)
-
-		if statusErr := r.Status().Update(ctx, provider); statusErr != nil {
-			log.Error(statusErr, "unable to update Provider status", "condition", condition)
-		}
-
-		return ctrl.Result{}, err
-	} else {
-		log.Info("Client fetched", "client", providerClient)
-
-		condition := metav1.Condition{
-			Type:               providerConditions.ClientCreatedConditionType,
-			Reason:             providerConditions.ClientCreated,
-			ObservedGeneration: provider.GetGeneration(),
-			Message:            "Client created",
-			Status:             metav1.ConditionTrue,
-		}
-
-		meta.SetStatusCondition(&provider.Status.Conditions, condition)
-
-		if statusErr := r.Status().Update(ctx, provider); statusErr != nil {
-			log.Error(statusErr, "unable to update Provider status", "condition", condition)
-		}
-	}
-
 	publicIp, err := r.FetchPublicIp(ctx, req, provider, log)
 	if err != nil {
 		log.Error(err, "unable to fetch public IP")
@@ -110,16 +72,29 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	if provider.Status.PublicIP != publicIp {
 		log.Info("Public IP changed", "old", provider.Status.PublicIP, "new", publicIp)
-		provider.Status.PublicIP = publicIp
 	}
 
-	providerIp := providerClient.GetIp()
+	provider.Status.PublicIP = publicIp
+
+	providerClient, err := r.FetchClient(ctx, req, provider, log)
+	if err != nil {
+		log.Error(err, "unable to fetch client")
+		return ctrl.Result{}, err
+	}
+
+	providerIp, err := providerClient.GetIp()
+	if err != nil {
+		log.Error(err, "trying to get IP from provider failed, maybe auth error?")
+
+		return ctrl.Result{}, err
+	}
 
 	if provider.Status.PublicIP != providerIp {
 		log.Info("IP Missmatch", "publicIP", provider.Status.PublicIP, "providerIP", providerIp)
 		providerClient.SetIp(provider.Status.PublicIP)
-		provider.Status.ProviderIP = provider.Status.PublicIP
 	}
+
+	provider.Status.ProviderIP = provider.Status.PublicIP
 
 	if err := r.Status().Update(ctx, provider); err != nil {
 		log.Error(err, "unable to update Provider status")
@@ -128,7 +103,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	return ctrl.Result{
 		Requeue:      true,
-		RequeueAfter: time.Minute * 15,
+		RequeueAfter: time.Second * 15,
 	}, nil
 }
 
@@ -265,6 +240,12 @@ func (r *ProviderReconciler) FetchClient(
 	provider *ddnsv1alpha1.Provider,
 	log logr.Logger,
 ) (clients.Client, error) {
+	var (
+		err     error
+		message string
+		status  metav1.ConditionStatus
+	)
+
 	secret, err := r.FetchSecret(ctx, req, provider, log)
 	if err != nil {
 		return nil, err
@@ -279,7 +260,30 @@ func (r *ProviderReconciler) FetchClient(
 
 	log.Info("ConfigMap fetched", "configMap", configMap)
 
-	return r.CreateClient(provider.Spec.Name, secret, configMap, log)
+	providerClient, err := r.CreateClient(provider.Spec.Name, secret, configMap, log)
+	if err != nil {
+		message = fmt.Sprintf("could not create client: %s", err)
+		status = metav1.ConditionFalse
+	} else {
+		message = "Client created"
+		status = metav1.ConditionTrue
+	}
+
+	condition := metav1.Condition{
+		Type:               providerConditions.ClientCreatedConditionType,
+		Reason:             providerConditions.ClientCreated,
+		ObservedGeneration: provider.GetGeneration(),
+		Message:            message,
+		Status:             status,
+	}
+
+	meta.SetStatusCondition(&provider.Status.Conditions, condition)
+
+	if statusErr := r.Status().Update(ctx, provider); statusErr != nil {
+		log.Error(statusErr, "unable to update Provider status", "condition", condition)
+	}
+
+	return providerClient, err
 }
 
 // CreateClientBasedOnInput will return an authenticated, fully loaded client
