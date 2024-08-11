@@ -42,10 +42,6 @@ type NotifierSpec struct {
 
 // NotifierStatus defines the observed state of Notifier
 type NotifierStatus struct {
-	// Hold notifier specific configuration such as API keys, tokens, etc. that were extracted from the secret
-	// @TODO: This may not be needed
-	Config map[string]string `json:"config,omitempty"`
-
 	// Represents the observations of a Notifier's current state.
 	// Notifier.status.conditions.type are: "Available" and "Progressing"
 	// Notifier.status.conditions.status are one of True, False, Unknown.
