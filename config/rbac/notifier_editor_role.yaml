@@ -1,0 +1,27 @@
+# permissions for end users to edit notifiers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: go-ddns-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: notifier-editor-role
+rules:
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
+  - notifiers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
+  - notifiers/status
+  verbs:
+  - get

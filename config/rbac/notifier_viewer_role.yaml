@@ -1,0 +1,23 @@
+# permissions for end users to view notifiers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: go-ddns-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: notifier-viewer-role
+rules:
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
+  - notifiers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
+  - notifiers/status
+  verbs:
+  - get
