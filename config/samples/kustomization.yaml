@@ -4,3 +4,4 @@ resources:
 - ddns_v1alpha1_notifier.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
 - secrets.yaml
+- configMaps.yaml

@@ -1,7 +1,5 @@
 package conditions
 
-// ====================================== Secret Errors =====================================
-
 var (
 	SecretConditionType = "SecretRetrieved"
 

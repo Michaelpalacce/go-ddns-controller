@@ -40,12 +40,13 @@ type ProviderSpec struct {
 
 	// ConfigMap is the name of the config map that holds the provider specific configuration.
 	//+kubebuilder:validation:Required
-	ConfigMap string `json:"config"`
+	ConfigMap string `json:"configMap"`
 }
 
 // ProviderStatus defines the observed state of Provider
 type ProviderStatus struct {
 	// Hold provider specific configuration such as API keys, tokens, etc. that were extracted from the secret
+	// @TODO: This may not be needed
 	Config map[string]string `json:"config,omitempty"`
 
 	// Represents the observations of a Provider's current state.

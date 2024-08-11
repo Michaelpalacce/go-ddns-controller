@@ -39,7 +39,7 @@ spec:
           spec:
             description: ProviderSpec defines the desired state of Provider
             properties:
-              config:
+              configMap:
                 description: ConfigMap is the name of the config map that holds the
                   provider specific configuration.
                 type: string
@@ -57,7 +57,7 @@ spec:
                     - apiToken: The Cloudflare API token.
                 type: string
             required:
-            - config
+            - configMap
             - name
             - secretName
             type: object
@@ -145,8 +145,9 @@ spec:
               config:
                 additionalProperties:
                   type: string
-                description: Hold provider specific configuration such as API keys,
-                  tokens, etc. that were extracted from the secret
+                description: |-
+                  Hold provider specific configuration such as API keys, tokens, etc. that were extracted from the secret
+                  @TODO: This may not be needed
                 type: object
             type: object
         type: object

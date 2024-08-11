@@ -1,0 +1,21 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cloudflare-config
+data:
+  config: |
+      {
+          "cloudflare": {
+              "zones": [
+                  {
+                      "name": "stefangenov.site",
+                      "records": [
+                          {
+                              "name": "stefangenov.site",
+                              "proxied": true
+                          }
+                      ]
+                  }
+              ]
+          }
+      }
