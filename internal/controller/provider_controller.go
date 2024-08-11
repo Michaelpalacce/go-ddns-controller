@@ -101,6 +101,8 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
+	fmt.Println("Provider: ", providerClient.GetIp())
+
 	return ctrl.Result{
 		Requeue:      true,
 		RequeueAfter: time.Minute * 15,
@@ -216,12 +218,7 @@ func (r *ProviderReconciler) FetchClient(
 
 	log.Info("ConfigMap fetched", "configMap", configMap)
 
-	client, err := r.CreateClient(provider.Spec.Name, secret, configMap, log)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
+	return r.CreateClient(provider.Spec.Name, secret, configMap, log)
 }
 
 // CreateClientBasedOnInput will return an authenticated, fully loaded client
