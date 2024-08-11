@@ -7,4 +7,14 @@ layout:
 - go.kubebuilder.io/v4
 projectName: go-ddns-controller
 repo: github.com/Michaelpalacce/go-ddns-controller
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: stefangenov.site
+  group: ddns
+  kind: Provider
+  path: github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1
+  version: v1alpha1
 version: "3"

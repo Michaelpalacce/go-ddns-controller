@@ -1,32 +1,23 @@
----
+# permissions for end users to view providers.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  labels:
+    app.kubernetes.io/name: go-ddns-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: provider-viewer-role
 rules:
 - apiGroups:
   - ddns.stefangenov.site
   resources:
   - providers
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
-- apiGroups:
-  - ddns.stefangenov.site
-  resources:
-  - providers/finalizers
-  verbs:
-  - update
 - apiGroups:
   - ddns.stefangenov.site
   resources:
   - providers/status
   verbs:
   - get
-  - patch
-  - update
