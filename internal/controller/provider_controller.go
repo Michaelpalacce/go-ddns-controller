@@ -31,7 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
 	providerConditions "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/provider/conditions"
@@ -78,35 +80,46 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
+	if err := r.PatchStatus(ctx, provider, updateProviderIp(provider, providerIp), log); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if publicIp, err = network.GetPublicIp(); err != nil {
 		log.Error(err, "unable to fetch public IP")
 		return ctrl.Result{}, err
 	}
 
-	if provider.Status.ProviderIP != providerIp {
-		provider.Status.ProviderIP = providerIp
-	}
-
-	if provider.Status.PublicIP != publicIp {
-		provider.Status.PublicIP = publicIp
+	if err := r.PatchStatus(ctx, provider, updatePublicIp(provider, publicIp), log); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if provider.Status.PublicIP != provider.Status.ProviderIP {
-		if err := providerClient.SetIp(provider.Status.ProviderIP); err != nil {
+		log.Info("IPs desynced, updating provider IP")
+
+		if err := providerClient.SetIp(provider.Status.PublicIP); err != nil {
 			log.Error(err, "unable to set IP on provider")
 			return ctrl.Result{}, err
 		}
 
-		provider.Status.ProviderIP = provider.Status.PublicIP
-
-		if err := r.UpdateStatus(ctx, provider, log); err != nil {
+		if err := r.PatchStatus(ctx, provider, updateProviderIp(provider, provider.Status.PublicIP), log); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
 
+	if err := r.PatchStatus(ctx, provider, func() bool {
+		if provider.Status.ObservedGeneration == provider.GetGeneration() {
+			return false
+		}
+		provider.Status.ObservedGeneration = provider.GetGeneration()
+		return true
+	}, log); err != nil {
+		log.Error(err, "unable to update Notifier status")
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{
 		Requeue:      true,
-		RequeueAfter: time.Second * 15,
+		RequeueAfter: time.Minute * 15,
 	}, nil
 }
 
@@ -114,6 +127,15 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 func (r *ProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&ddnsv1alpha1.Provider{}).
+		// WithEventFilter will only trigger the reconcile function if the observed generation is different from the new generation
+		WithEventFilter(predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				newGeneration := e.ObjectNew.GetGeneration()
+				observedGeneration := e.ObjectNew.DeepCopyObject().(*ddnsv1alpha1.Provider).Status.ObservedGeneration
+
+				return observedGeneration != newGeneration
+			},
+		}).
 		Complete(r)
 }
 
@@ -141,7 +163,7 @@ func (r *ProviderReconciler) FetchSecret(
 		status = metav1.ConditionTrue
 	}
 
-	condition := &metav1.Condition{
+	condition := metav1.Condition{
 		Type:    providerConditions.SecretConditionType,
 		Reason:  providerConditions.SecretFound,
 		Message: message,
@@ -175,7 +197,7 @@ func (r *ProviderReconciler) FetchConfig(
 		status = metav1.ConditionTrue
 	}
 
-	condition := &metav1.Condition{
+	condition := metav1.Condition{
 		Type:    providerConditions.ConfigMapConditionType,
 		Reason:  providerConditions.ConfigMapFound,
 		Message: message,
@@ -218,7 +240,7 @@ func (r *ProviderReconciler) FetchClient(
 		status = metav1.ConditionTrue
 	}
 
-	condition := &metav1.Condition{
+	condition := metav1.Condition{
 		Type:    providerConditions.ClientConditionType,
 		Reason:  providerConditions.ClientCreated,
 		Message: message,
@@ -271,27 +293,59 @@ func (r *ProviderReconciler) CreateClient(
 func (r *ProviderReconciler) UpdateConditions(
 	ctx context.Context,
 	provider *ddnsv1alpha1.Provider,
-	condition *metav1.Condition,
+	condition metav1.Condition,
 	log logr.Logger,
 ) error {
-	condition.ObservedGeneration = provider.GetGeneration()
-	change := meta.SetStatusCondition(&provider.Status.Conditions, *condition)
-	if change {
-		return r.UpdateStatus(ctx, provider, log)
+	return r.PatchStatus(ctx, provider, func() bool {
+		condition.ObservedGeneration = provider.GetGeneration()
+
+		return meta.SetStatusCondition(&provider.Status.Conditions, condition)
+	}, log)
+}
+
+func (r *ProviderReconciler) PatchStatus(
+	ctx context.Context,
+	provider *ddnsv1alpha1.Provider,
+	apply func() bool,
+	log logr.Logger,
+) error {
+	patch := client.MergeFrom(provider.DeepCopy())
+	if apply() {
+		if err := r.Status().Patch(ctx, provider, patch); err != nil {
+			log.Error(err, "unable to patch status")
+			return err
+		}
 	}
 
 	return nil
 }
 
-// UpdateStatus updates the status of the Notifier
-func (r *ProviderReconciler) UpdateStatus(
-	ctx context.Context,
+func updateProviderIp(
 	provider *ddnsv1alpha1.Provider,
-	log logr.Logger,
-) error {
-	if err := r.Status().Update(ctx, provider); err != nil {
-		return err
-	}
+	providerIp string,
+) func() bool {
+	return func() bool {
+		if provider.Status.ProviderIP == providerIp {
+			return false
+		}
 
-	return nil
+		provider.Status.ProviderIP = providerIp
+
+		return true
+	}
+}
+
+func updatePublicIp(
+	provider *ddnsv1alpha1.Provider,
+	publicIp string,
+) func() bool {
+	return func() bool {
+		if provider.Status.PublicIP == publicIp {
+			return false
+		}
+
+		provider.Status.PublicIP = publicIp
+
+		return true
+	}
 }

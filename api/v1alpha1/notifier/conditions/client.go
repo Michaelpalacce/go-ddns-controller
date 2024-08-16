@@ -4,6 +4,6 @@ var (
 	ClientConditionType = "Client"
 
 	// Reasons
-	ClientCreated = "ClientCreated"
-	ClientAuth    = "ClientAuth"
+	ClientCreated       = "ClientCreated"
+	ClientCommunication = "ClientCommunication"
 )

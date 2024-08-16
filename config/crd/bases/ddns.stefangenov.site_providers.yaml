@@ -157,6 +157,12 @@ spec:
                   - type
                   type: object
                 type: array
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the most recent generation observed for this Provider.
+                  This gets updated at the end of a successful reconciliation.
+                format: int64
+                type: integer
               providerIP:
                 description: ProviderIP is the IP address that the provider has set.
                 type: string

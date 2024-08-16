@@ -55,6 +55,10 @@ type ProviderStatus struct {
 	// PublicIP is your public IP address.
 	PublicIP string `json:"publicIP,omitempty"`
 
+	// ObservedGeneration is the most recent generation observed for this Provider.
+	// This gets updated at the end of a successful reconciliation.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Represents the observations of a Provider's current state.
 	// Provider.status.conditions.type are: "Available" and "Progressing"
 	// Provider.status.conditions.status are one of True, False, Unknown.
