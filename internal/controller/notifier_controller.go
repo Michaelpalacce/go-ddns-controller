@@ -72,17 +72,26 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	if err = notifierClient.SendGreetings(); err != nil {
-		log.Error(err, "unable to send greetings")
+	if notifier.Status.ObservedGeneration != notifier.GetGeneration() {
+		if err = notifierClient.SendGreetings(); err != nil {
+			log.Error(err, "unable to send greetings")
 
-		condition := metav1.Condition{
-			Type:    notifierConditions.ClientConditionType,
-			Reason:  notifierConditions.ClientAuthFailed,
-			Message: fmt.Sprintf("unable to send greetings: %s", err),
-			Status:  metav1.ConditionFalse,
+			condition := metav1.Condition{
+				Type:    notifierConditions.ClientConditionType,
+				Reason:  notifierConditions.ClientAuthFailed,
+				Message: fmt.Sprintf("unable to send greetings: %s", err),
+				Status:  metav1.ConditionFalse,
+			}
+
+			r.UpdateConditions(ctx, notifier, condition, log)
 		}
 
-		r.UpdateConditions(ctx, notifier, condition, log)
+		notifier.Status.ObservedGeneration = notifier.GetGeneration()
+
+		if err = r.Status().Update(ctx, notifier); err != nil {
+			log.Error(err, "unable to update Notifier status")
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{}, nil

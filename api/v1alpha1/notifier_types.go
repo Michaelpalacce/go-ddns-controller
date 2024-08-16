@@ -46,6 +46,9 @@ type NotifierStatus struct {
 	// It is set to true when the notifier is ready to send notifications.
 	IsReady bool `json:"isReady,omitempty"`
 
+	// ObservedGeneration is the most recent generation observed for this Notifier.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Represents the observations of a Notifier's current state.
 	// Notifier.status.conditions.type are: "Available" and "Progressing"
 	// Notifier.status.conditions.status are one of True, False, Unknown.
