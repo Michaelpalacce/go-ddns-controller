@@ -16,12 +16,8 @@
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
-make docker-build docker-push IMG=ghcr.io/michaelpalacce/go-ddns-controller:v1.0.0
+make docker-build docker-push IMG=ghcr.io/michaelpalacce/go-ddns-controller:latest
 ```
-
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
 
 **Install the CRDs into the cluster:**
 
@@ -32,7 +28,7 @@ make install
 **Deploy the Manager to the cluster with the image specified by `IMG`:**
 
 ```sh
-make deploy IMG=ghcr.io/michaelpalacce/go-ddns-controller:v1.0.0
+make deploy IMG=ghcr.io/michaelpalacce/go-ddns-controller:latest
 ```
 
 > **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
@@ -73,7 +69,7 @@ Following are the steps to build the installer and distribute this project to us
 1. Build the installer for the image built and published in the registry:
 
 ```sh
-make build-installer IMG=<some-registry>/go-ddns-controller:tag
+make build-installer IMG=ghcr.io/michaelpalacce/go-ddns-controller:latest
 ```
 
 NOTE: The makefile target mentioned above generates an 'install.yaml'
