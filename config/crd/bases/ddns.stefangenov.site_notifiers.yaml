@@ -147,6 +147,11 @@ spec:
                   IsReady is the status of the notifier.
                   It is set to true when the notifier is ready to send notifications.
                 type: boolean
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation observed
+                  for this Notifier.
+                format: int64
+                type: integer
             type: object
         type: object
     served: true

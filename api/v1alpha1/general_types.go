@@ -5,6 +5,6 @@ type ResourceRef struct {
 	//+kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	//+kubebuilder:validation:Optional
+	//+kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
 }

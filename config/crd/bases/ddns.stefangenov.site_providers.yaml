@@ -52,6 +52,7 @@ spec:
                 description: Notifiers is a list of notifiers that the provider should
                   use to notify for changes.
                 items:
+                  description: ResourceRef is a reference to a resource in the cluster.
                   properties:
                     name:
                       type: string

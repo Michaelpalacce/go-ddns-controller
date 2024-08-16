@@ -19,3 +19,10 @@ data:
               ]
           }
       }
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: webhook-config
+data:
+  config: ""

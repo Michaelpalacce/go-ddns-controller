@@ -54,51 +54,54 @@ type ProviderReconciler struct {
 func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	log.Info("Reconciling Provider")
+	var (
+		err            error
+		providerClient clients.Client
+		providerIp     string
+		publicIp       string
+	)
 
 	provider := &ddnsv1alpha1.Provider{}
-	if err := r.Get(ctx, req.NamespacedName, provider); err != nil {
-		log.Error(err, "unable to fetch Provider, skipping")
+	if err = r.Get(ctx, req.NamespacedName, provider); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	log.Info("Provider fetched", "provider", provider.Spec)
+	log.Info("Provider triggered")
 
-	publicIp, err := r.FetchPublicIp(ctx, req, provider, log)
-	if err != nil {
-		log.Error(err, "unable to fetch public IP")
-		return ctrl.Result{}, err
-	}
-
-	if provider.Status.PublicIP != publicIp {
-		log.Info("Public IP changed", "old", provider.Status.PublicIP, "new", publicIp)
-	}
-
-	provider.Status.PublicIP = publicIp
-
-	providerClient, err := r.FetchClient(ctx, req, provider, log)
-	if err != nil {
+	if providerClient, err = r.FetchClient(ctx, req, provider, log); err != nil {
 		log.Error(err, "unable to fetch client")
 		return ctrl.Result{}, err
 	}
 
-	providerIp, err := providerClient.GetIp()
-	if err != nil {
+	if providerIp, err = providerClient.GetIp(); err != nil {
 		log.Error(err, "trying to get IP from provider failed, maybe auth error?")
-
 		return ctrl.Result{}, err
 	}
 
-	if provider.Status.PublicIP != providerIp {
-		log.Info("IP Missmatch", "publicIP", provider.Status.PublicIP, "providerIP", providerIp)
-		providerClient.SetIp(provider.Status.PublicIP)
+	if publicIp, err = network.GetPublicIp(); err != nil {
+		log.Error(err, "unable to fetch public IP")
+		return ctrl.Result{}, err
 	}
 
-	provider.Status.ProviderIP = provider.Status.PublicIP
+	if provider.Status.ProviderIP != providerIp {
+		provider.Status.ProviderIP = providerIp
+	}
 
-	if err := r.Status().Update(ctx, provider); err != nil {
-		log.Error(err, "unable to update Provider status")
-		return ctrl.Result{}, err
+	if provider.Status.PublicIP != publicIp {
+		provider.Status.PublicIP = publicIp
+	}
+
+	if provider.Status.PublicIP != provider.Status.ProviderIP {
+		if err := providerClient.SetIp(provider.Status.ProviderIP); err != nil {
+			log.Error(err, "unable to set IP on provider")
+			return ctrl.Result{}, err
+		}
+
+		provider.Status.ProviderIP = provider.Status.PublicIP
+
+		if err := r.UpdateStatus(ctx, provider, log); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	return ctrl.Result{
@@ -112,46 +115,6 @@ func (r *ProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&ddnsv1alpha1.Provider{}).
 		Complete(r)
-}
-
-// FetchPublicIp will fetch the public IP of the machine that is running goip
-// it will also update the status of the Provider so logic is isolated in this function
-func (r *ProviderReconciler) FetchPublicIp(
-	ctx context.Context,
-	req ctrl.Request,
-	provider *ddnsv1alpha1.Provider,
-	log logr.Logger,
-) (string, error) {
-	var (
-		message string
-		status  metav1.ConditionStatus
-	)
-
-	ip, err := network.GetPublicIp()
-
-	if err != nil {
-		message = fmt.Sprintf("error while trying to fetch public IP: %s", err)
-		status = metav1.ConditionFalse
-	} else {
-		message = fmt.Sprintf("Public IP fetched: %s", ip)
-		status = metav1.ConditionTrue
-	}
-
-	condition := metav1.Condition{
-		Type:               providerConditions.PublicIpConditionType,
-		Reason:             providerConditions.PublicIpFetched,
-		Message:            message,
-		Status:             status,
-		ObservedGeneration: provider.GetGeneration(),
-	}
-
-	meta.SetStatusCondition(&provider.Status.Conditions, condition)
-
-	if statusErr := r.Status().Update(ctx, provider); statusErr != nil {
-		log.Error(statusErr, "unable to update Provider status", "condition", condition)
-	}
-
-	return ip, err
 }
 
 // FetchSecret will fetch the secret from the namespace and set the status of the Provider
@@ -178,19 +141,14 @@ func (r *ProviderReconciler) FetchSecret(
 		status = metav1.ConditionTrue
 	}
 
-	condition := metav1.Condition{
-		Type:               providerConditions.SecretConditionType,
-		Reason:             providerConditions.SecretFound,
-		ObservedGeneration: provider.GetGeneration(),
-		Message:            message,
-		Status:             status,
+	condition := &metav1.Condition{
+		Type:    providerConditions.SecretConditionType,
+		Reason:  providerConditions.SecretFound,
+		Message: message,
+		Status:  status,
 	}
 
-	meta.SetStatusCondition(&provider.Status.Conditions, condition)
-
-	if statusErr := r.Status().Update(ctx, provider); statusErr != nil {
-		log.Error(statusErr, "unable to update Provider status", "condition", condition)
-	}
+	r.UpdateConditions(ctx, provider, condition, log)
 
 	return secret, nil
 }
@@ -217,19 +175,14 @@ func (r *ProviderReconciler) FetchConfig(
 		status = metav1.ConditionTrue
 	}
 
-	condition := metav1.Condition{
-		Type:               providerConditions.ConfigMapConditionType,
-		Reason:             providerConditions.ConfigMapFound,
-		ObservedGeneration: provider.GetGeneration(),
-		Message:            message,
-		Status:             status,
+	condition := &metav1.Condition{
+		Type:    providerConditions.ConfigMapConditionType,
+		Reason:  providerConditions.ConfigMapFound,
+		Message: message,
+		Status:  status,
 	}
 
-	meta.SetStatusCondition(&provider.Status.Conditions, condition)
-
-	if statusErr := r.Status().Update(ctx, provider); statusErr != nil {
-		log.Error(statusErr, "unable to update Provider status", "condition", condition)
-	}
+	r.UpdateConditions(ctx, provider, condition, log)
 
 	return configMap, err
 }
@@ -251,14 +204,10 @@ func (r *ProviderReconciler) FetchClient(
 		return nil, err
 	}
 
-	log.Info("Secret fetched")
-
 	configMap, err := r.FetchConfig(ctx, req, provider, log)
 	if err != nil {
 		return nil, err
 	}
-
-	log.Info("ConfigMap fetched", "configMap", configMap)
 
 	providerClient, err := r.CreateClient(provider.Spec.Name, secret, configMap, log)
 	if err != nil {
@@ -269,19 +218,14 @@ func (r *ProviderReconciler) FetchClient(
 		status = metav1.ConditionTrue
 	}
 
-	condition := metav1.Condition{
-		Type:               providerConditions.ClientConditionType,
-		Reason:             providerConditions.ClientCreated,
-		ObservedGeneration: provider.GetGeneration(),
-		Message:            message,
-		Status:             status,
+	condition := &metav1.Condition{
+		Type:    providerConditions.ClientConditionType,
+		Reason:  providerConditions.ClientCreated,
+		Message: message,
+		Status:  status,
 	}
 
-	meta.SetStatusCondition(&provider.Status.Conditions, condition)
-
-	if statusErr := r.Status().Update(ctx, provider); statusErr != nil {
-		log.Error(statusErr, "unable to update Provider status", "condition", condition)
-	}
+	r.UpdateConditions(ctx, provider, condition, log)
 
 	return providerClient, err
 }
@@ -322,4 +266,32 @@ func (r *ProviderReconciler) CreateClient(
 	}
 
 	return client, nil
+}
+
+func (r *ProviderReconciler) UpdateConditions(
+	ctx context.Context,
+	provider *ddnsv1alpha1.Provider,
+	condition *metav1.Condition,
+	log logr.Logger,
+) error {
+	condition.ObservedGeneration = provider.GetGeneration()
+	change := meta.SetStatusCondition(&provider.Status.Conditions, *condition)
+	if change {
+		return r.UpdateStatus(ctx, provider, log)
+	}
+
+	return nil
+}
+
+// UpdateStatus updates the status of the Notifier
+func (r *ProviderReconciler) UpdateStatus(
+	ctx context.Context,
+	provider *ddnsv1alpha1.Provider,
+	log logr.Logger,
+) error {
+	if err := r.Status().Update(ctx, provider); err != nil {
+		return err
+	}
+
+	return nil
 }
