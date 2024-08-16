@@ -27,8 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
 	notifierConditions "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/notifier/conditions"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/notifiers"
@@ -84,13 +86,55 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			}
 
 			r.UpdateConditions(ctx, notifier, condition, log)
+			return ctrl.Result{}, err
 		}
 
+		notifier.Status.IsReady = true
 		notifier.Status.ObservedGeneration = notifier.GetGeneration()
 
 		if err = r.Status().Update(ctx, notifier); err != nil {
 			log.Error(err, "unable to update Notifier status")
 			return ctrl.Result{}, err
+		}
+	}
+
+	providers := &v1alpha1.ProviderList{}
+	if err := r.List(ctx, providers); err != nil {
+		log.Error(err, "unable to list Providers")
+		return ctrl.Result{}, err
+	}
+
+	for _, provider := range providers.Items {
+		for _, notifiers := range provider.Spec.NotifierRefs {
+			namespace := notifiers.Namespace
+			if notifiers.Name == notifier.Name && (namespace == notifier.Namespace || namespace == "") {
+				log.Info("Provider is referencing notifier", "provider", provider.Name)
+				// Check if annotation with the notifier namespacedName is present
+				if provider.Annotations != nil {
+					annotation := fmt.Sprintf("%s_%s", req.Name, req.Namespace)
+					if value, ok := provider.Annotations[annotation]; ok {
+						if value == provider.Status.PublicIP {
+							log.Info("Public IP is the same as the last one, not notifying", "publicIP", value)
+							continue
+						} else {
+							log.Info("Public IP is different, notifying", "publicIP", value)
+
+							message := fmt.Sprintf("Public IP changed to %s, old was %s", provider.Status.PublicIP, value)
+
+							if err = notifierClient.SendNotification(message); err != nil {
+								log.Error(err, "unable to send notification")
+								return ctrl.Result{}, err
+							}
+
+							provider.Annotations[annotation] = provider.Status.PublicIP
+							if err = r.Update(ctx, &provider); err != nil {
+								log.Error(err, "unable to update Provider")
+								return ctrl.Result{}, err
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -257,5 +301,9 @@ func (r *NotifierReconciler) UpdateConditions(
 func (r *NotifierReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&ddnsv1alpha1.Notifier{}).
+		Watches(
+			&v1alpha1.Provider{},
+			&handler.EnqueueRequestForObject{},
+		).
 		Complete(r)
 }
