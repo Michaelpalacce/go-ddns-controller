@@ -16,7 +16,7 @@
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
-make docker-build docker-push IMG=<some-registry>/go-ddns-controller:tag
+make docker-build docker-push IMG=ghcr.io/michaelpalacce/go-ddns-controller:v1.0.0
 ```
 
 **NOTE:** This image ought to be published in the personal registry you specified.
@@ -32,7 +32,7 @@ make install
 **Deploy the Manager to the cluster with the image specified by `IMG`:**
 
 ```sh
-make deploy IMG=<some-registry>/go-ddns-controller:tag
+make deploy IMG=ghcr.io/michaelpalacce/go-ddns-controller:v1.0.0
 ```
 
 > **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
