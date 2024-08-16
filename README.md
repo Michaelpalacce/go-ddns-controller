@@ -1,6 +1,6 @@
 # go-ddns-controller
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](
+![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
 A Kubernetes controller for managing DDNS records. 
 
