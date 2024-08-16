@@ -4,7 +4,7 @@ metadata:
   labels:
     app.kubernetes.io/name: go-ddns-controller
     app.kubernetes.io/managed-by: kustomize
-  name: notifier-sample
+  name: webhook-notifier
 spec:
   name: Webhook
   secretName: webhook

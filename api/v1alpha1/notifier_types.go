@@ -42,6 +42,10 @@ type NotifierSpec struct {
 
 // NotifierStatus defines the observed state of Notifier
 type NotifierStatus struct {
+	// IsReady is the status of the notifier.
+	// It is set to true when the notifier is ready to send notifications.
+	IsReady bool `json:"isReady,omitempty"`
+
 	// Represents the observations of a Notifier's current state.
 	// Notifier.status.conditions.type are: "Available" and "Progressing"
 	// Notifier.status.conditions.status are one of True, False, Unknown.

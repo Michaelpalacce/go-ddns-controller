@@ -1,7 +1,7 @@
 package conditions
 
 var (
-	ClientCreatedConditionType = "ClientCreated"
+	ClientConditionType = "Client"
 
 	// Reasons
 	ClientCreated = "ClientCreated"

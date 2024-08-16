@@ -48,6 +48,20 @@ spec:
                 enum:
                 - Cloudflare
                 type: string
+              notifierRefs:
+                description: Notifiers is a list of notifiers that the provider should
+                  use to notify for changes.
+                items:
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                  required:
+                  - name
+                  - namespace
+                  type: object
+                type: array
               secretName:
                 description: |-
                   SecretName is the name of the secret that holds the provider specific configuration.

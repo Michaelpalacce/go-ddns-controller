@@ -41,6 +41,10 @@ type ProviderSpec struct {
 	// ConfigMap is the name of the config map that holds the provider specific configuration.
 	//+kubebuilder:validation:Required
 	ConfigMap string `json:"configMap"`
+
+	// Notifiers is a list of notifiers that the provider should use to notify for changes.
+	//+kubebuilder:validation:Optional
+	NotifierRefs []ResourceRef `json:"notifierRefs,omitempty"`
 }
 
 // ProviderStatus defines the observed state of Provider

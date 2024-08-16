@@ -18,13 +18,21 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
+	notifierConditions "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/notifier/conditions"
+	"github.com/Michaelpalacce/go-ddns-controller/internal/notifiers"
+	"github.com/go-logr/logr"
 )
 
 // NotifierReconciler reconciles a Notifier object
@@ -47,11 +55,193 @@ type NotifierReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.4/pkg/reconcile
 func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	notifier := &ddnsv1alpha1.Notifier{}
+
+	if err := r.Get(ctx, req.NamespacedName, notifier); err != nil {
+		log.Error(err, "unable to fetch Notifier")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	log.Info("Notifier fetched", "notifier", notifier.Spec)
+
+	notifierClient, err := r.FetchNotifier(ctx, req, notifier, log)
+	if err != nil {
+		log.Error(err, "unable to fetch notifier")
+		return ctrl.Result{}, err
+	}
+
+	if err = notifierClient.SendGreetings(); err != nil {
+		log.Error(err, "unable to send greetings")
+
+		condition := metav1.Condition{
+			Type:    notifierConditions.ClientConditionType,
+			Reason:  notifierConditions.ClientAuthFailed,
+			Message: fmt.Sprintf("unable to send greetings: %s", err),
+			Status:  metav1.ConditionFalse,
+		}
+
+		r.UpdateConditions(ctx, notifier, condition, log)
+	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *NotifierReconciler) FetchNotifier(
+	ctx context.Context,
+	req ctrl.Request,
+	notifier *ddnsv1alpha1.Notifier,
+	log logr.Logger,
+) (notifiers.Notifier, error) {
+	var (
+		err     error
+		message string
+		status  metav1.ConditionStatus
+	)
+
+	configMap, err := r.FetchConfig(ctx, req, notifier, log)
+	if err != nil {
+		log.Error(err, "unable to fetch ConfigMap")
+		return nil, err
+	}
+
+	secret, err := r.FetchSecret(ctx, req, notifier, log)
+	if err != nil {
+		log.Error(err, "unable to fetch Secret")
+		return nil, err
+	}
+
+	notifierClient, err := r.CreateNotifier(ctx, notifier, secret, configMap)
+	if err != nil {
+		message = fmt.Sprintf("could not create client: %s", err)
+		status = metav1.ConditionFalse
+	} else {
+		message = "Client created"
+		status = metav1.ConditionTrue
+	}
+
+	condition := metav1.Condition{
+		Type:    notifierConditions.ClientConditionType,
+		Reason:  notifierConditions.ClientCreated,
+		Message: message,
+		Status:  status,
+	}
+
+	r.UpdateConditions(ctx, notifier, condition, log)
+
+	return notifierClient, err
+}
+
+func (r *NotifierReconciler) CreateNotifier(
+	ctx context.Context,
+	notifier *ddnsv1alpha1.Notifier,
+	secret *corev1.Secret,
+	configMap *corev1.ConfigMap,
+) (notifiers.Notifier, error) {
+	switch notifier.Spec.Name {
+	case notifiers.Webhook:
+		if secret.Data["url"] == nil {
+			return nil, fmt.Errorf("`url` not found in secret")
+		}
+
+		return &notifiers.WebhookNotifier{
+			Url: string(secret.Data["url"]),
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown notifier %s", notifier.Spec.Name)
+	}
+}
+
+func (r *NotifierReconciler) FetchConfig(
+	ctx context.Context,
+	req ctrl.Request,
+	notifier *ddnsv1alpha1.Notifier,
+	log logr.Logger,
+) (*corev1.ConfigMap, error) {
+	var (
+		configMap *corev1.ConfigMap
+		err       error
+		message   string
+		status    metav1.ConditionStatus
+	)
+	configMap = &corev1.ConfigMap{}
+
+	if err = r.Get(ctx, types.NamespacedName{Name: notifier.Spec.ConfigMap, Namespace: req.Namespace}, configMap); err != nil {
+		message = fmt.Sprintf("ConfigMap %s not found", notifier.Spec.ConfigMap)
+		status = metav1.ConditionFalse
+	} else {
+		message = fmt.Sprintf("ConfigMap %s found", notifier.Spec.ConfigMap)
+		status = metav1.ConditionTrue
+	}
+
+	condition := metav1.Condition{
+		Type:    notifierConditions.ConfigMapConditionType,
+		Reason:  notifierConditions.ConfigMapFound,
+		Message: message,
+		Status:  status,
+	}
+
+	r.UpdateConditions(ctx, notifier, condition, log)
+
+	return configMap, err
+}
+
+func (r *NotifierReconciler) FetchSecret(
+	ctx context.Context,
+	req ctrl.Request,
+	notifier *ddnsv1alpha1.Notifier,
+	log logr.Logger,
+) (*corev1.Secret, error) {
+	var (
+		err     error
+		message string
+		status  metav1.ConditionStatus
+		secret  *corev1.Secret
+	)
+
+	secret = &corev1.Secret{}
+	if err = r.Get(ctx, types.NamespacedName{Name: notifier.Spec.SecretName, Namespace: req.Namespace}, secret); err != nil {
+		message = fmt.Sprintf("Secret %s not found", notifier.Spec.SecretName)
+		status = metav1.ConditionFalse
+	} else {
+		message = fmt.Sprintf("Secret %s found", notifier.Spec.SecretName)
+		status = metav1.ConditionTrue
+	}
+
+	condition := metav1.Condition{
+		Type:    notifierConditions.SecretConditionType,
+		Reason:  notifierConditions.SecretFound,
+		Message: message,
+		Status:  status,
+	}
+
+	r.UpdateConditions(ctx, notifier, condition, log)
+
+	return secret, nil
+}
+
+// UpdateConditions updates the conditions of the Notifier
+// Sets the ObservedGeneration of the condition to the generation of the Notifier
+func (r *NotifierReconciler) UpdateConditions(
+	ctx context.Context,
+	notifier *ddnsv1alpha1.Notifier,
+	condition metav1.Condition,
+	log logr.Logger,
+) error {
+	condition.ObservedGeneration = notifier.GetGeneration()
+	changed := meta.SetStatusCondition(&notifier.Status.Conditions, condition)
+
+	if !changed {
+		return nil
+	}
+
+	if err := r.Status().Update(ctx, notifier); err != nil {
+		log.Error(err, "unable to update Notifier status")
+		return err
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

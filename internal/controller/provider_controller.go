@@ -270,7 +270,7 @@ func (r *ProviderReconciler) FetchClient(
 	}
 
 	condition := metav1.Condition{
-		Type:               providerConditions.ClientCreatedConditionType,
+		Type:               providerConditions.ClientConditionType,
 		Reason:             providerConditions.ClientCreated,
 		ObservedGeneration: provider.GetGeneration(),
 		Message:            message,
