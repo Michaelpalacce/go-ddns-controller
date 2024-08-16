@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: ghcr.io/michaelpalacce/go-ddns-controller
-  newTag: v1.0.0
+  newTag: latest
