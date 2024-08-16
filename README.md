@@ -1,8 +1,19 @@
 # go-ddns-controller
-// TODO(user): Add simple overview of use/purpose
+
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](
+
+A Kubernetes controller for managing DDNS records. 
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+
+This project is a Kubernetes controller that manages DDNS records. It's purpose is to be installed on a Kubernetes cluster
+running on a network with a public IP address. The controller will monitor the public IP address of the cluster and update
+the DNS records of the specified domain to point to the new IP address.
+
+### What is DDNS?
+
+Dynamic DNS (DDNS or DynDNS) is a method of automatically updating a name server in the Domain Name System (DNS), 
+often in real time, with the active DDNS configuration of its configured hostnames, addresses or other information.
 
 ## Getting Started
 
