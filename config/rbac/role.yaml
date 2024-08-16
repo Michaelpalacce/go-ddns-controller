@@ -5,6 +5,22 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - ddns.stefangenov.site
   resources:
   - notifiers
@@ -26,6 +42,32 @@ rules:
   - ddns.stefangenov.site
   resources:
   - notifiers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
+  - providers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
+  - providers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
+  - providers/status
   verbs:
   - get
   - patch
