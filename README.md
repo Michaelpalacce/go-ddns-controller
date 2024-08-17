@@ -15,6 +15,105 @@ the DNS records of the specified domain to point to the new IP address.
 Dynamic DNS (DDNS or DynDNS) is a method of automatically updating a name server in the Domain Name System (DNS), 
 often in real time, with the active DDNS configuration of its configured hostnames, addresses or other information.
 
+## Providers
+
+Providers allow the controller to interact with different DNS providers. The controller will use the provider to update the DNS records of the specified domain.
+
+Example Provider CRD:
+```yaml
+apiVersion: ddns.stefangenov.site/v1alpha1
+kind: Provider
+metadata:
+  labels:
+    app.kubernetes.io/name: go-ddns-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: cloudflare-provider
+spec:
+  name: Cloudflare
+  secretName: cloudflare
+  configMap: cloudflare-config
+  notifierRefs:
+    - name: webhook-notifier
+```
+
+Each provider has both a secret and a config map. The secret contains the credentials needed to authenticate with the provider's API.
+The config map contains the configuration needed to interact with the provider. 
+The provider also has a list of notifiers that will be triggered when the provider updates the DNS records. The notifierRefs are optional.
+
+### Supported Providers
+
+#### Cloudflare
+
+The Cloudflare provider allows the controller to interact with the Cloudflare API to update the DNS records of the specified domain.
+
+##### Secret
+
+| Key | Description |
+| --- | ----------- |
+| apiToken | The Cloudflare API token |
+
+##### Config Map
+
+The configMap contains one key `config`.
+
+The value of the `config` key is a JSON object with the following properties:
+```json
+{
+  "cloudflare": {
+      "zones": [
+          {
+              "name": "stefangenov.site",
+              "records": [
+                  {
+                      "name": "stefangenov.site",
+                      "proxied": true
+                  }
+              ]
+          }
+      ]
+  }
+}
+```
+
+## Notifiers
+
+Notifiers allow the controller to send notifications when the DNS records are updated. 
+The controller will trigger the notifiers when the provider updates the DNS records.
+
+Example Notifier CRD:
+```yaml
+apiVersion: ddns.stefangenov.site/v1alpha1
+kind: Notifier
+metadata:
+  labels:
+    app.kubernetes.io/name: go-ddns-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: webhook-notifier
+spec:
+  name: Webhook
+  secretName: webhook
+  configMap: webhook-config
+```
+
+Each notifier has both a secret and a config map. The secret contains the credentials needed to authenticate with the notifier's API.
+The config map contains the configuration needed to interact with the notifier.
+
+### Supported Notifiers
+
+#### Webhook
+
+The Webhook notifier allows the controller to send a POST request to a specified URL when the DNS records are updated.
+
+##### Secret
+
+| Key | Description |
+| --- | ----------- |
+| URL | The URL to send the message to. |
+
+##### Config Map
+
+The configMap contains one key `config`. The value of `config` is "" for now.
+
 ## Getting Started
 
 ### Prerequisites
