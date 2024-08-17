@@ -23,8 +23,8 @@ import (
 // NotifierSpec defines the desired state of Notifier
 type NotifierSpec struct {
 	// Name is the name of the notifier we want to create.
-	//+kubebuilder:validation:Required
-	//+kubebuilder:validation:Enum:=Webhook
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum:=Webhook
 	Name string `json:"name"`
 
 	// SecretName is the name of the secret that holds the notifier specific configuration.
@@ -32,11 +32,11 @@ type NotifierSpec struct {
 	// Notifiers:
 	// - Webhook: The secret should have the following keys:
 	//   - url: .The Webhook URL. Treated as a secret as it may contain sensitive data.
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	SecretName string `json:"secretName"`
 
 	// ConfigMap is the name of the config map that holds the provider specific configuration.
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	ConfigMap string `json:"configMap"`
 }
 

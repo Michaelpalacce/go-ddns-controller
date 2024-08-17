@@ -10,7 +10,11 @@ import (
 // Will also close the ReadStream
 func GetBody(url string) ([]byte, error) {
 	if resp, err := http.Get(url); err == nil {
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				fmt.Println("Error while closing response body")
+			}
+		}()
 
 		if body, err := io.ReadAll(resp.Body); err == nil {
 			return body, nil

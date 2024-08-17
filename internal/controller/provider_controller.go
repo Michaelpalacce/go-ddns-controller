@@ -81,7 +81,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	if err := r.PatchStatus(ctx, provider, updateProviderIp(provider, providerIp), log); err != nil {
+	if err := r.PatchStatus(ctx, provider, r.updateProviderIp(provider, providerIp), log); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -90,7 +90,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	if err := r.PatchStatus(ctx, provider, updatePublicIp(provider, publicIp), log); err != nil {
+	if err := r.PatchStatus(ctx, provider, r.updatePublicIp(provider, publicIp), log); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -102,7 +102,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, err
 		}
 
-		if err := r.PatchStatus(ctx, provider, updateProviderIp(provider, provider.Status.PublicIP), log); err != nil {
+		if err := r.PatchStatus(ctx, provider, r.updateProviderIp(provider, provider.Status.PublicIP), log); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -171,7 +171,7 @@ func (r *ProviderReconciler) FetchSecret(
 		Status:  status,
 	}
 
-	r.UpdateConditions(ctx, provider, condition, log)
+	_ = r.UpdateConditions(ctx, provider, condition, log)
 
 	return secret, nil
 }
@@ -205,7 +205,7 @@ func (r *ProviderReconciler) FetchConfig(
 		Status:  status,
 	}
 
-	r.UpdateConditions(ctx, provider, condition, log)
+	_ = r.UpdateConditions(ctx, provider, condition, log)
 
 	return configMap, err
 }
@@ -248,7 +248,7 @@ func (r *ProviderReconciler) FetchClient(
 		Status:  status,
 	}
 
-	r.UpdateConditions(ctx, provider, condition, log)
+	_ = r.UpdateConditions(ctx, provider, condition, log)
 
 	return providerClient, err
 }
@@ -321,10 +321,7 @@ func (r *ProviderReconciler) PatchStatus(
 	return nil
 }
 
-func updateProviderIp(
-	provider *ddnsv1alpha1.Provider,
-	providerIp string,
-) func() bool {
+func (p ProviderReconciler) updateProviderIp(provider *ddnsv1alpha1.Provider, providerIp string) func() bool {
 	return func() bool {
 		if provider.Status.ProviderIP == providerIp {
 			return false
@@ -336,10 +333,7 @@ func updateProviderIp(
 	}
 }
 
-func updatePublicIp(
-	provider *ddnsv1alpha1.Provider,
-	publicIp string,
-) func() bool {
+func (p ProviderReconciler) updatePublicIp(provider *ddnsv1alpha1.Provider, publicIp string) func() bool {
 	return func() bool {
 		if provider.Status.PublicIP == publicIp {
 			return false

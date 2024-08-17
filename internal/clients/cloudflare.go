@@ -117,7 +117,9 @@ func (c CloudflareClient) setIpForZone(ip string, zone Zone) error {
 
 	for _, r := range zone.Records {
 		c.Logger.Info("Setting IP for record", "record", r)
-		c.setIpForRecord(ip, zoneID, r)
+		if err := c.setIpForRecord(ip, zoneID, r); err != nil {
+			return err
+		}
 	}
 
 	return nil

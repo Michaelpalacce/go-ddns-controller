@@ -26,8 +26,8 @@ type ProviderSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Name is the name of the provider we want to create.
-	//+kubebuilder:validation:Required
-	//+kubebuilder:validation:Enum:=Cloudflare
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum:=Cloudflare
 	Name string `json:"name"`
 
 	// SecretName is the name of the secret that holds the provider specific configuration.
@@ -35,15 +35,15 @@ type ProviderSpec struct {
 	// Providers:
 	// - Cloudflare: The secret should have the following keys:
 	//   - apiToken: The Cloudflare API token.
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	SecretName string `json:"secretName"`
 
 	// ConfigMap is the name of the config map that holds the provider specific configuration.
-	//+kubebuilder:validation:Required
+	// +kubebuilder:validation:Required
 	ConfigMap string `json:"configMap"`
 
 	// Notifiers is a list of notifiers that the provider should use to notify for changes.
-	//+kubebuilder:validation:Optional
+	// +kubebuilder:validation:Optional
 	NotifierRefs []ResourceRef `json:"notifierRefs,omitempty"`
 }
 
