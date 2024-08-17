@@ -85,7 +85,7 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	filteredProviders := []ddnsv1alpha1.Provider{}
 	for _, provider := range providers.Items {
 		for _, ref := range provider.Spec.NotifierRefs {
-			if ref.Name == req.Name && ref.Namespace == req.Namespace {
+			if ref.Name == req.Name {
 				filteredProviders = append(filteredProviders, provider)
 				break
 			}
@@ -384,7 +384,7 @@ func (r *NotifierReconciler) findObjectsForProvider(ctx context.Context, provide
 		requests[i] = reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Name:      notifierRef.Name,
-				Namespace: notifierRef.Namespace,
+				Namespace: provider.GetNamespace(),
 			},
 		}
 	}
