@@ -62,11 +62,7 @@ func (w *WebhookNotifier) sendToWebhook(data string) error {
 		return err
 	}
 
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			slog.Error("error while closing response body", "error", err)
-		}
-	}()
+	defer resp.Body.Close()
 
 	slog.Debug("Status Code", "code", resp.StatusCode)
 
