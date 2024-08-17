@@ -11,4 +11,4 @@ spec:
   configMap: cloudflare-config
   notifierRefs:
     - name: webhook-notifier
-      namespace: default
+      namespace: go-ddns-controller-system
