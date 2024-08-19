@@ -60,6 +60,13 @@ spec:
                   - name
                   type: object
                 type: array
+              retryInterval:
+                default: 900
+                description: |-
+                  RetryInterval is the interval in seconds that the provider should wait before retrying to update the IP.
+                  Default is 900 seconds (15 minutes).
+                format: int64
+                type: integer
               secretName:
                 description: |-
                   SecretName is the name of the secret that holds the provider specific configuration.

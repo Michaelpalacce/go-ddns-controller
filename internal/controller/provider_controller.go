@@ -120,7 +120,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	return ctrl.Result{
 		Requeue:      true,
-		RequeueAfter: time.Minute * 15,
+		RequeueAfter: time.Second * time.Duration(provider.Spec.RetryInterval),
 	}, nil
 }
 

@@ -42,6 +42,12 @@ type ProviderSpec struct {
 	// +kubebuilder:validation:Required
 	ConfigMap string `json:"configMap"`
 
+	// RetryInterval is the interval in seconds that the provider should wait before retrying to update the IP.
+	// Default is 900 seconds (15 minutes).
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:=900
+	RetryInterval int64 `json:"retryInterval"`
+
 	// Notifiers is a list of notifiers that the provider should use to notify for changes.
 	// +kubebuilder:validation:Optional
 	NotifierRefs []ResourceRef `json:"notifierRefs,omitempty"`
