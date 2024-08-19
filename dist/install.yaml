@@ -401,7 +401,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: go-ddns-controller-manager-role
+  name: go-ddns-controller-go-ddns-cluster-manager-role
 rules:
 - apiGroups:
   - ""
@@ -627,7 +627,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: go-ddns-controller-manager-role
+  name: manager-role
 subjects:
 - kind: ServiceAccount
   name: go-ddns-controller-controller-manager

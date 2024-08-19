@@ -44,8 +44,10 @@ help: ## Display this help.
 ##@ Development
 
 .PHONY: manifests
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects. This also generates the CRD manifests for the Helm chart.
+	$(CONTROLLER_GEN) rbac:roleName=go-ddns-cluster-manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases && \
+	cp config/crd/bases/* charts/go-ddns-controller/crds && \
+	cp config/rbac/role.yaml charts/go-ddns-controller/templates/role.yaml
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
