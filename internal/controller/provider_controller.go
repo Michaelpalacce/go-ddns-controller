@@ -71,6 +71,15 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	log.Info("Provider triggered")
 
+	if publicIp, err = network.GetPublicIp(); err != nil {
+		log.Error(err, "unable to fetch public IP")
+		return ctrl.Result{}, err
+	}
+
+	if err := r.PatchStatus(ctx, provider, r.updatePublicIp(provider, publicIp), log); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	if providerClient, err = r.FetchClient(ctx, req, provider, log); err != nil {
 		log.Error(err, "unable to fetch client")
 		return ctrl.Result{}, err
@@ -82,15 +91,6 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if err := r.PatchStatus(ctx, provider, r.updateProviderIp(provider, providerIp), log); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if publicIp, err = network.GetPublicIp(); err != nil {
-		log.Error(err, "unable to fetch public IP")
-		return ctrl.Result{}, err
-	}
-
-	if err := r.PatchStatus(ctx, provider, r.updatePublicIp(provider, publicIp), log); err != nil {
 		return ctrl.Result{}, err
 	}
 
