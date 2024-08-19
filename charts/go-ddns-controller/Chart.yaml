@@ -1,6 +1,10 @@
 apiVersion: v2
 name: go-ddns-controller
-description: A Helm chart for Kubernetes
+description: |
+  A Helm chart for installing the go-ddns-controller. 
+  The go-ddns-controller is a Kubernetes controller that updates DNS records in a DNS provider.
+  It also supports notifications for when a DNS record is updated through the use of notifiers.
+  One provider can have multiple notifiers.
 
 # A chart can be either an 'application' or a 'library' chart.
 #
