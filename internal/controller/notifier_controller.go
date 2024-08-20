@@ -123,7 +123,7 @@ func (r *NotifierReconciler) MarkAsReady(
 			Reason: notifierConditions.ClientCommunication,
 		}
 
-		if err = notifierClient.SendGreetings(); err != nil {
+		if err = notifierClient.SendGreetings(notifier); err != nil {
 			log.Error(err, "unable to send greetings")
 			condition.Message = fmt.Sprintf("unable to send greetings: %s", err)
 			condition.Status = metav1.ConditionFalse
@@ -173,9 +173,9 @@ func (r *NotifierReconciler) NotifyOfChange(
 	var message string
 
 	if provider.Status.ProviderIP == provider.Status.PublicIP {
-		message = fmt.Sprintf("Provider IP (%s) in sync with Public IP", provider.Status.ProviderIP)
+		message = fmt.Sprintf("Provider IP (%s) in sync with Public IP. From provider: (%s).", provider.Status.ProviderIP, provider.Name)
 	} else {
-		message = fmt.Sprintf("Provider IP (%s) out of sync with Public IP (%s)", provider.Status.ProviderIP, provider.Status.PublicIP)
+		message = fmt.Sprintf("Provider IP (%s) out of sync with Public IP (%s). From provider: (%s).", provider.Status.ProviderIP, provider.Status.PublicIP, provider.Name)
 	}
 
 	patch := client.MergeFrom(provider.DeepCopy())
