@@ -161,6 +161,7 @@ func (r *ProviderReconciler) FetchSecret(
 	)
 
 	secret = &corev1.Secret{}
+	fmt.Println("provider.Spec.SecretName: ", provider.Spec.SecretName)
 	if err = r.Get(ctx, types.NamespacedName{Name: provider.Spec.SecretName, Namespace: req.Namespace}, secret); err != nil {
 		message = fmt.Sprintf("Secret %s not found", provider.Spec.SecretName)
 		status = metav1.ConditionFalse
@@ -178,7 +179,7 @@ func (r *ProviderReconciler) FetchSecret(
 
 	_ = r.UpdateConditions(ctx, provider, condition, log)
 
-	return secret, nil
+	return secret, err
 }
 
 func (r *ProviderReconciler) FetchConfig(

@@ -18,13 +18,16 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +39,8 @@ import (
 var _ = Describe("Provider Controller", func() {
 	Context("When reconciling a resource", func() {
 		ctx := context.Background()
+		dummyIp := "127.0.0.1"
+		var controllerReconciler *ProviderReconciler
 
 		providerNamespacedName := types.NamespacedName{
 			Name:      "test-provider",
@@ -83,6 +88,8 @@ var _ = Describe("Provider Controller", func() {
 				}
 
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			} else {
+				Expect(err).NotTo(HaveOccurred())
 			}
 
 			By("creating the Secret for the Provider")
@@ -99,6 +106,8 @@ var _ = Describe("Provider Controller", func() {
 				}
 
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			} else {
+				Expect(err).NotTo(HaveOccurred())
 			}
 
 			By("creating the custom resource for the Kind Provider")
@@ -111,7 +120,7 @@ var _ = Describe("Provider Controller", func() {
 					},
 					Spec: ddnsv1alpha1.ProviderSpec{
 						Name:          "Cloudflare",
-						SecretName:    "cloudflare-secret",
+						SecretName:    secretNamespacedName.Name,
 						ConfigMap:     configMapNamespacedName.Name,
 						RetryInterval: 900,
 						NotifierRefs:  []ddnsv1alpha1.ResourceRef{},
@@ -120,6 +129,20 @@ var _ = Describe("Provider Controller", func() {
 				}
 
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			} else {
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			By("creating the ProviderReconciler")
+			controllerReconciler = &ProviderReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{}, nil
+				},
 			}
 		})
 
@@ -140,28 +163,322 @@ var _ = Describe("Provider Controller", func() {
 
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
+
 			provider := &ddnsv1alpha1.Provider{}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should set correct conditions", func() {
+			By("Reconciling the created resource")
+
+			provider := &ddnsv1alpha1.Provider{}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(provider.Status.ObservedGeneration).To(Equal(int64(1)))
+			Expect(provider.Status.Conditions).To(HaveLen(3))
+			Expect(meta.IsStatusConditionTrue(provider.Status.Conditions, "ConfigMap")).To(BeTrue())
+			Expect(meta.IsStatusConditionTrue(provider.Status.Conditions, "Secret")).To(BeTrue())
+			Expect(meta.IsStatusConditionTrue(provider.Status.Conditions, "Client")).To(BeTrue())
+
+			secretCondition := meta.FindStatusCondition(provider.Status.Conditions, "Secret")
+			Expect(secretCondition.Message).To(Equal(fmt.Sprintf("Secret %s found", secretNamespacedName.Name)))
+
+			configMapCondition := meta.FindStatusCondition(provider.Status.Conditions, "ConfigMap")
+			Expect(configMapCondition.Message).To(Equal(fmt.Sprintf("ConfigMap %s found", configMapNamespacedName.Name)))
+
+			clientCondition := meta.FindStatusCondition(provider.Status.Conditions, "Client")
+			Expect(clientCondition.Message).To(Equal("Client created"))
+		})
+
+		It("should set correct IPs if ProviderIP is empty", func() {
+			By("Reconciling the created resource")
+
+			provider := &ddnsv1alpha1.Provider{}
+
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 				IPProvider: func() (string, error) {
-					return "127.0.0.1", nil
+					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
-					return MockClient{}, nil
+					return MockClient{
+						IP: "",
+					}, nil
 				},
 			}
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: providerNamespacedName,
-			})
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
 			Expect(err).NotTo(HaveOccurred())
 
 			err = k8sClient.Get(ctx, providerNamespacedName, provider)
-
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(provider.Status.PublicIP).To(Equal("127.0.0.1"))
+			Expect(provider.Status.PublicIP).To(Equal(dummyIp))
+			Expect(provider.Status.ProviderIP).To(Equal(dummyIp))
+		})
+
+		It("should set correct IPs if ProviderIP is different", func() {
+			By("Reconciling the created resource")
+
+			dummyProviderIP := "127.0.0.2"
+			calledCounter := 0
+			provider := &ddnsv1alpha1.Provider{}
+
+			controllerReconciler := &ProviderReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{
+						IP: dummyProviderIP,
+						SetIPInterceptor: func(ip string) {
+							calledCounter++
+
+							Expect(calledCounter).To(Equal(1))
+							Expect(ip).To(Equal(dummyIp))
+						},
+					}, nil
+				},
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(provider.Status.PublicIP).To(Equal(dummyIp))
+			Expect(provider.Status.ProviderIP).To(Equal(dummyIp))
+		})
+
+		It("should set correct IPs if ProviderIP is different", func() {
+			By("Reconciling the created resource")
+
+			dummyProviderIP := "127.0.0.2"
+			calledCounter := 0
+			provider := &ddnsv1alpha1.Provider{}
+
+			controllerReconciler := &ProviderReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{
+						IP: dummyProviderIP,
+						SetIPInterceptor: func(ip string) {
+							calledCounter++
+
+							Expect(calledCounter).To(Equal(1))
+							Expect(ip).To(Equal(dummyIp))
+						},
+					}, nil
+				},
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(provider.Status.PublicIP).To(Equal(dummyIp))
+			Expect(provider.Status.ProviderIP).To(Equal(dummyIp))
+		})
+
+		It("should change ProviderIP if the PublicIP changes", func() {
+			By("Reconciling the created resource")
+
+			// Overwrite the providerNamespacedName to create a new resource
+			providerNamespacedName := types.NamespacedName{
+				Name:      "provider-with-existing-status",
+				Namespace: "default",
+			}
+
+			dummyProviderIP := "127.0.0.2"
+			dummyIp := "127.0.0.1"
+			calledCounter := 0
+			provider := &ddnsv1alpha1.Provider{}
+
+			By("creating the custom resource for the Kind Provider with existing status")
+			err := k8sClient.Get(ctx, providerNamespacedName, provider)
+			if err != nil && errors.IsNotFound(err) {
+				resource := &ddnsv1alpha1.Provider{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      providerNamespacedName.Name,
+						Namespace: providerNamespacedName.Namespace,
+					},
+					Spec: ddnsv1alpha1.ProviderSpec{
+						Name:          "Cloudflare",
+						SecretName:    secretNamespacedName.Name,
+						ConfigMap:     configMapNamespacedName.Name,
+						RetryInterval: 900,
+						NotifierRefs:  []ddnsv1alpha1.ResourceRef{},
+					},
+					// Currently pointing to one IP, but it will be changed in the test
+					Status: ddnsv1alpha1.ProviderStatus{
+						PublicIP:   dummyProviderIP,
+						ProviderIP: dummyProviderIP,
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+				// Cleanup the resource after the test
+				defer func() {
+					Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, resource))).NotTo(HaveOccurred())
+				}()
+			} else {
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			controllerReconciler := &ProviderReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{
+						IP: dummyProviderIP,
+						SetIPInterceptor: func(ip string) {
+							calledCounter++
+
+							Expect(calledCounter).To(Equal(1))
+							Expect(ip).To(Equal(dummyIp))
+						},
+					}, nil
+				},
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(provider.Status.PublicIP).To(Equal(dummyIp))
+			Expect(provider.Status.ProviderIP).To(Equal(dummyIp))
+		})
+
+		It("should not reconcile with unexisting configMap", func() {
+			By("Reconciling the created resource")
+
+			// Overwrite the providerNamespacedName to create a new resource
+			providerNamespacedName := types.NamespacedName{
+				Name:      "provider-with-wrong-configmap",
+				Namespace: "default",
+			}
+
+			provider := &ddnsv1alpha1.Provider{}
+
+			err := k8sClient.Get(ctx, providerNamespacedName, provider)
+			if err != nil && errors.IsNotFound(err) {
+				By("creating the custom resource for the Kind Provider with unexisting secret")
+				resource := &ddnsv1alpha1.Provider{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      providerNamespacedName.Name,
+						Namespace: providerNamespacedName.Namespace,
+					},
+					Spec: ddnsv1alpha1.ProviderSpec{
+						Name:          "Cloudflare",
+						SecretName:    secretNamespacedName.Name,
+						ConfigMap:     "unexisting-configmap",
+						RetryInterval: 900,
+						NotifierRefs:  []ddnsv1alpha1.ResourceRef{},
+					},
+					// Currently pointing to one IP, but it will be changed in the test
+					Status: ddnsv1alpha1.ProviderStatus{},
+				}
+
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+				// Cleanup the resource after the test
+				defer func() {
+					Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, resource))).NotTo(HaveOccurred())
+				}()
+			} else {
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).To(HaveOccurred())
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(provider.Status.Conditions).To(HaveLen(2))
+			Expect(meta.IsStatusConditionFalse(provider.Status.Conditions, "ConfigMap")).To(BeTrue())
+
+			condition := meta.FindStatusCondition(provider.Status.Conditions, "ConfigMap")
+			Expect(condition.Message).To(Equal("ConfigMap unexisting-configmap not found"))
+		})
+
+		It("should not reconcile with unexisting secret", func() {
+			By("Reconciling the created resource")
+
+			// Overwrite the providerNamespacedName to create a new resource
+			providerNamespacedName := types.NamespacedName{
+				Name:      "provider-with-wrong-secret",
+				Namespace: "default",
+			}
+
+			provider := &ddnsv1alpha1.Provider{}
+
+			err := k8sClient.Get(ctx, providerNamespacedName, provider)
+			if err != nil && errors.IsNotFound(err) {
+				By("creating the custom resource for the Kind Provider with unexisting secret")
+				resource := &ddnsv1alpha1.Provider{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      providerNamespacedName.Name,
+						Namespace: providerNamespacedName.Namespace,
+					},
+					Spec: ddnsv1alpha1.ProviderSpec{
+						Name:          "Cloudflare",
+						SecretName:    "unexisting-secret",
+						ConfigMap:     configMapNamespacedName.Name,
+						RetryInterval: 900,
+						NotifierRefs:  []ddnsv1alpha1.ResourceRef{},
+					},
+					// Currently pointing to one IP, but it will be changed in the test
+					Status: ddnsv1alpha1.ProviderStatus{},
+				}
+
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+				// Cleanup the resource after the test
+				defer func() {
+					Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, resource))).NotTo(HaveOccurred())
+				}()
+			} else {
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).To(HaveOccurred())
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(provider.Status.Conditions).To(HaveLen(1))
+			Expect(meta.IsStatusConditionFalse(provider.Status.Conditions, "Secret")).To(BeTrue())
+
+			condition := meta.FindStatusCondition(provider.Status.Conditions, "Secret")
+			Expect(condition.Message).To(Equal("Secret unexisting-secret not found"))
 		})
 	})
 })

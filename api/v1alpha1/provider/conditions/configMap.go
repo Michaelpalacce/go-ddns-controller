@@ -1,7 +1,7 @@
 package conditions
 
 var (
-	ConfigMapConditionType = "ConfigMapRetrieved"
+	ConfigMapConditionType = "ConfigMap"
 
 	// Reasons
 	ConfigMapFound = "ConfigMapFound"

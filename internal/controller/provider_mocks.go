@@ -1,15 +1,23 @@
 package controller
 
 type MockClient struct {
-	SetIpError error
-	GetIpError error
-	IP         string
+	SetIPError       error
+	GetIPError       error
+	IP               string
+	SetIPInterceptor func(string)
+	GetIPInterceptor func()
 }
 
 func (c MockClient) GetIp() (string, error) {
-	return c.IP, c.GetIpError
+	if c.GetIPInterceptor != nil {
+		c.GetIPInterceptor()
+	}
+	return c.IP, c.GetIPError
 }
 
 func (c MockClient) SetIp(ip string) error {
-	return c.SetIpError
+	if c.SetIPInterceptor != nil {
+		c.SetIPInterceptor(ip)
+	}
+	return c.SetIPError
 }

@@ -1,7 +1,7 @@
 package conditions
 
 var (
-	SecretConditionType = "SecretRetrieved"
+	SecretConditionType = "Secret"
 
 	// Reasons
 	SecretFound = "SecretFound"
