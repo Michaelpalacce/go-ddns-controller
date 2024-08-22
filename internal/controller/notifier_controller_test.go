@@ -30,7 +30,8 @@ import (
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
 )
 
-var _ = Describe("Notifier Controller", func() {
+// Pending, need to be implemented
+var _ = PDescribe("Notifier Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 

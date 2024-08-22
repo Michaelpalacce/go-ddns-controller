@@ -37,7 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
+	"github.com/Michaelpalacce/go-ddns-controller/internal/clients"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/controller"
+	"github.com/Michaelpalacce/go-ddns-controller/internal/network"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -148,8 +150,10 @@ func main() {
 	}
 
 	if err = (&controller.ProviderReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:        mgr.GetClient(),
+		Scheme:        mgr.GetScheme(),
+		IpProvider:    network.GetPublicIp,
+		ClientFactory: clients.ClientFactory,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Provider")
 		os.Exit(1)

@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -32,53 +33,130 @@ import (
 
 var _ = Describe("Provider Controller", func() {
 	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
-
 		ctx := context.Background()
 
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+		providerNamespacedName := types.NamespacedName{
+			Name:      "test-provider",
+			Namespace: "default",
 		}
-		provider := &ddnsv1alpha1.Provider{}
+
+		configMapNamespacedName := types.NamespacedName{
+			Name:      "cloudflare-config",
+			Namespace: "default",
+		}
+
+		secretNamespacedName := types.NamespacedName{
+			Name:      "cloudflare-secret",
+			Namespace: "default",
+		}
 
 		BeforeEach(func() {
+			var err error
+			By("creating the ConfigMap for the Provider")
+
+			err = k8sClient.Get(ctx, configMapNamespacedName, &corev1.ConfigMap{})
+			if err != nil && errors.IsNotFound(err) {
+				resource := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      configMapNamespacedName.Name,
+						Namespace: configMapNamespacedName.Namespace,
+					},
+					Data: map[string]string{
+						"config": `{
+                          "cloudflare": {
+                              "zones": [
+                                  {
+                                      "name": "example.com",
+                                      "records": [
+                                          {
+                                              "name": "example.com",
+                                              "proxied": true
+                                          }
+                                      ]
+                                  }
+                              ]
+                          }
+                        }`,
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			}
+
+			By("creating the Secret for the Provider")
+			err = k8sClient.Get(ctx, secretNamespacedName, &corev1.Secret{})
+			if err != nil && errors.IsNotFound(err) {
+				resource := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      secretNamespacedName.Name,
+						Namespace: secretNamespacedName.Namespace,
+					},
+					StringData: map[string]string{
+						"apiToken": "test-token",
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			}
+
 			By("creating the custom resource for the Kind Provider")
-			err := k8sClient.Get(ctx, typeNamespacedName, provider)
+			err = k8sClient.Get(ctx, providerNamespacedName, &ddnsv1alpha1.Provider{})
 			if err != nil && errors.IsNotFound(err) {
 				resource := &ddnsv1alpha1.Provider{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
+						Name:      providerNamespacedName.Name,
+						Namespace: providerNamespacedName.Namespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: ddnsv1alpha1.ProviderSpec{
+						Name:          "Cloudflare",
+						SecretName:    "cloudflare-secret",
+						ConfigMap:     configMapNamespacedName.Name,
+						RetryInterval: 900,
+						NotifierRefs:  []ddnsv1alpha1.ResourceRef{},
+					},
+					Status: ddnsv1alpha1.ProviderStatus{},
 				}
+
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &ddnsv1alpha1.Provider{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
+			providerResource := &ddnsv1alpha1.Provider{}
+			secretResource := &corev1.Secret{}
+			configMapResource := &corev1.ConfigMap{}
 
-			By("Cleanup the specific resource instance Provider")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			Expect(k8sClient.Get(ctx, providerNamespacedName, providerResource)).NotTo(HaveOccurred())
+			Expect(k8sClient.Get(ctx, secretNamespacedName, secretResource)).NotTo(HaveOccurred())
+			Expect(k8sClient.Get(ctx, configMapNamespacedName, configMapResource)).NotTo(HaveOccurred())
+
+			By("Cleanup the specific resource instance Provider and related resources")
+			Expect(k8sClient.Delete(ctx, providerResource)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, secretResource)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, configMapResource)).To(Succeed())
 		})
+
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
+			provider := &ddnsv1alpha1.Provider{}
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
+				IpProvider: func() (string, error) {
+					return "127.0.0.1", nil
+				},
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				NamespacedName: providerNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(provider.Status.PublicIP).To(Equal("127.0.0.1"))
 		})
 	})
 })

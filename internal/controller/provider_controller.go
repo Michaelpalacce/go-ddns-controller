@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -41,10 +40,17 @@ import (
 	"github.com/Michaelpalacce/go-ddns-controller/internal/network"
 )
 
+type (
+	IpProvider    func() (string, error)
+	ClientFactory func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error)
+)
+
 // ProviderReconciler reconciles a Provider object
 type ProviderReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme        *runtime.Scheme
+	IpProvider    IpProvider
+	ClientFactory ClientFactory
 }
 
 // +kubebuilder:rbac:groups=ddns.stefangenov.site,resources=providers,verbs=get;list;watch;create;update;patch;delete
@@ -232,7 +238,7 @@ func (r *ProviderReconciler) FetchClient(
 		return nil, err
 	}
 
-	providerClient, err := r.CreateClient(provider.Spec.Name, secret, configMap, log)
+	providerClient, err := r.ClientFactory(provider.Spec.Name, secret, configMap, log)
 	if err != nil {
 		message = fmt.Sprintf("could not create client: %s", err)
 		status = metav1.ConditionFalse
@@ -251,44 +257,6 @@ func (r *ProviderReconciler) FetchClient(
 	_ = r.UpdateConditions(ctx, provider, condition, log)
 
 	return providerClient, err
-}
-
-// CreateClientBasedOnInput will return an authenticated, fully loaded client
-func (r *ProviderReconciler) CreateClient(
-	name string,
-	secret *corev1.Secret,
-	configMap *corev1.ConfigMap,
-	log logr.Logger,
-) (clients.Client, error) {
-	var client clients.Client
-	switch name {
-	case clients.Cloudflare:
-		var cloudflareConfig clients.CloudflareConfig
-
-		if configMap.Data["config"] == "" {
-			return nil, fmt.Errorf("`config` not found in configMap")
-		}
-
-		configMap := configMap.Data["config"]
-
-		err := json.Unmarshal([]byte(configMap), &cloudflareConfig)
-		if err != nil {
-			return nil, fmt.Errorf("could not unmarshal the config: %s", err)
-		}
-
-		if secret.Data["apiToken"] == nil {
-			return nil, fmt.Errorf("`apiToken` not found in secret")
-		}
-
-		client, err = clients.NewCloudflareClient(cloudflareConfig, string(secret.Data["apiToken"]), log)
-		if err != nil {
-			return nil, fmt.Errorf("could not create a Cloudflare client: %s", err)
-		}
-	default:
-		return nil, fmt.Errorf("could not create a provider of type: %s", name)
-	}
-
-	return client, nil
 }
 
 func (r *ProviderReconciler) UpdateConditions(
