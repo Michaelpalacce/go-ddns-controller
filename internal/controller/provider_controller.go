@@ -37,11 +37,10 @@ import (
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
 	providerConditions "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/provider/conditions"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/clients"
-	"github.com/Michaelpalacce/go-ddns-controller/internal/network"
 )
 
 type (
-	IpProvider    func() (string, error)
+	IPProvider    func() (string, error)
 	ClientFactory func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error)
 )
 
@@ -49,7 +48,7 @@ type (
 type ProviderReconciler struct {
 	client.Client
 	Scheme        *runtime.Scheme
-	IpProvider    IpProvider
+	IPProvider    IPProvider
 	ClientFactory ClientFactory
 }
 
@@ -77,7 +76,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	log.Info("Provider triggered")
 
-	if publicIp, err = network.GetPublicIp(); err != nil {
+	if publicIp, err = r.IPProvider(); err != nil {
 		log.Error(err, "unable to fetch public IP")
 		return ctrl.Result{}, err
 	}

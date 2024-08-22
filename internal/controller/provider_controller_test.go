@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 
+	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
+	"github.com/Michaelpalacce/go-ddns-controller/internal/clients"
 )
 
 var _ = Describe("Provider Controller", func() {
@@ -142,8 +144,11 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IpProvider: func() (string, error) {
+				IPProvider: func() (string, error) {
 					return "127.0.0.1", nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{}, nil
 				},
 			}
 

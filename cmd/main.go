@@ -152,7 +152,7 @@ func main() {
 	if err = (&controller.ProviderReconciler{
 		Client:        mgr.GetClient(),
 		Scheme:        mgr.GetScheme(),
-		IpProvider:    network.GetPublicIp,
+		IPProvider:    network.GetPublicIp,
 		ClientFactory: clients.ClientFactory,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Provider")
