@@ -40,6 +40,7 @@ var _ = Describe("Provider Controller", func() {
 	Context("When reconciling a resource", func() {
 		ctx := context.Background()
 		dummyIp := "127.0.0.1"
+		dummyProviderIP := "127.0.0.2"
 		var controllerReconciler *ProviderReconciler
 
 		providerNamespacedName := types.NamespacedName{
@@ -231,7 +232,6 @@ var _ = Describe("Provider Controller", func() {
 		It("should set correct IPs if ProviderIP is different", func() {
 			By("Reconciling the created resource")
 
-			dummyProviderIP := "127.0.0.2"
 			calledCounter := 0
 			provider := &ddnsv1alpha1.Provider{}
 
@@ -267,7 +267,6 @@ var _ = Describe("Provider Controller", func() {
 		It("should set correct IPs if ProviderIP is different", func() {
 			By("Reconciling the created resource")
 
-			dummyProviderIP := "127.0.0.2"
 			calledCounter := 0
 			provider := &ddnsv1alpha1.Provider{}
 
@@ -309,8 +308,6 @@ var _ = Describe("Provider Controller", func() {
 				Namespace: "default",
 			}
 
-			dummyProviderIP := "127.0.0.2"
-			dummyIp := "127.0.0.1"
 			calledCounter := 0
 			provider := &ddnsv1alpha1.Provider{}
 
