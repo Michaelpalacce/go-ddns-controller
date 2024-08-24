@@ -1,5 +1,11 @@
 package controller
 
+import (
+	"context"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
 type MockClient struct {
 	SetIPError       error
 	GetIPError       error
@@ -20,4 +26,39 @@ func (c MockClient) SetIp(ip string) error {
 		c.SetIPInterceptor(ip)
 	}
 	return c.SetIPError
+}
+
+type ClientWrapper struct {
+	client.Client
+	PatchStatusError   error
+	PatchStatusIndex   int // When to fail the PatchStatus
+	CurrentStatusIndex int
+}
+
+func (c *ClientWrapper) Status() client.StatusWriter {
+	wrapper := &StatusWriterWrapper{
+		StatusWriter:       c.Client.Status(),
+		PatchStatusError:   c.PatchStatusError,
+		PatchStatusIndex:   c.PatchStatusIndex,
+		CurrentStatusIndex: c.CurrentStatusIndex,
+	}
+	c.CurrentStatusIndex++
+	return wrapper
+}
+
+type StatusWriterWrapper struct {
+	client.StatusWriter
+	PatchStatusError   error
+	PatchStatusIndex   int
+	CurrentStatusIndex int
+}
+
+func (s *StatusWriterWrapper) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
+	if s.PatchStatusError != nil {
+		if s.CurrentStatusIndex == s.PatchStatusIndex {
+			return s.PatchStatusError
+		}
+	}
+
+	return s.StatusWriter.Patch(ctx, obj, patch, opts...)
 }

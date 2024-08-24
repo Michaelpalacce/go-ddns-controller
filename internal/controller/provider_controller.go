@@ -77,7 +77,6 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log.Info("Provider triggered")
 
 	if publicIp, err = r.IPProvider(); err != nil {
-		log.Error(err, "unable to fetch public IP")
 		return ctrl.Result{}, err
 	}
 
@@ -86,12 +85,10 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if providerClient, err = r.FetchClient(ctx, req, provider, log); err != nil {
-		log.Error(err, "unable to fetch client")
 		return ctrl.Result{}, err
 	}
 
 	if providerIp, err = providerClient.GetIp(); err != nil {
-		log.Error(err, "trying to get IP from provider failed, maybe auth error?")
 		return ctrl.Result{}, err
 	}
 
@@ -103,7 +100,6 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		log.Info("IPs desynced, updating provider IP")
 
 		if err := providerClient.SetIp(provider.Status.PublicIP); err != nil {
-			log.Error(err, "unable to set IP on provider")
 			return ctrl.Result{}, err
 		}
 
@@ -119,7 +115,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		provider.Status.ObservedGeneration = provider.GetGeneration()
 		return true
 	}, log); err != nil {
-		log.Error(err, "unable to update Notifier status")
+		log.Error(err, "unable to update Provider status")
 		return ctrl.Result{}, err
 	}
 
@@ -161,7 +157,6 @@ func (r *ProviderReconciler) FetchSecret(
 	)
 
 	secret = &corev1.Secret{}
-	fmt.Println("provider.Spec.SecretName: ", provider.Spec.SecretName)
 	if err = r.Get(ctx, types.NamespacedName{Name: provider.Spec.SecretName, Namespace: req.Namespace}, secret); err != nil {
 		message = fmt.Sprintf("Secret %s not found", provider.Spec.SecretName)
 		status = metav1.ConditionFalse

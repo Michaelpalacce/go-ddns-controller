@@ -480,5 +480,208 @@ var _ = Describe("Provider Controller", func() {
 			condition := meta.FindStatusCondition(provider.Status.Conditions, "Secret")
 			Expect(condition.Message).To(Equal("Secret unexisting-secret not found"))
 		})
+
+		It("should not reconcile if cannot fetch public IP", func() {
+			provider := &ddnsv1alpha1.Provider{}
+			var err error
+
+			controllerReconciler := &ProviderReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				IPProvider: func() (string, error) {
+					return "", fmt.Errorf("cannot fetch public IP")
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{
+						IP: "",
+					}, nil
+				},
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("cannot fetch public IP"))
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(provider.Status.PublicIP).To(Equal(""))
+		})
+
+		It("should not reconcile if the ClientFactory cannot create a provider", func() {
+			provider := &ddnsv1alpha1.Provider{}
+			var err error
+
+			controllerReconciler := &ProviderReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return nil, fmt.Errorf("cannot create client")
+				},
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("cannot create client"))
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(provider.Status.Conditions).To(HaveLen(3))
+			Expect(meta.IsStatusConditionFalse(provider.Status.Conditions, "Client")).To(BeTrue())
+
+			condition := meta.FindStatusCondition(provider.Status.Conditions, "Client")
+			Expect(condition.Message).To(Equal("could not create client: cannot create client"))
+		})
+
+		It("should not reconcile if the ProviderIP cannot be fetched", func() {
+			provider := &ddnsv1alpha1.Provider{}
+			var err error
+
+			controllerReconciler := &ProviderReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{
+						IP:         "",
+						GetIPError: fmt.Errorf("cannot get IP"),
+					}, nil
+				},
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("cannot get IP"))
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(provider.Status.PublicIP).To(Equal(dummyIp))
+			Expect(provider.Status.ProviderIP).To(Equal(""))
+		})
+
+		It("should not reconcile if the ProviderIP cannot be set", func() {
+			provider := &ddnsv1alpha1.Provider{}
+			var err error
+
+			controllerReconciler := &ProviderReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{
+						IP:         "",
+						SetIPError: fmt.Errorf("cannot set IP"),
+					}, nil
+				},
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("cannot set IP"))
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should not reconcile if we cannot patch the public ip in the Status", func() {
+			provider := &ddnsv1alpha1.Provider{}
+			var err error
+
+			clientWrapper := &ClientWrapper{
+				Client:           k8sClient,
+				PatchStatusError: fmt.Errorf("cannot patch status"),
+			}
+
+			controllerReconciler := &ProviderReconciler{
+				Client: clientWrapper,
+				Scheme: clientWrapper.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{
+						IP: "",
+					}, nil
+				},
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("cannot patch status"))
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should not reconcile if we cannot patch the provider ip in the Status", func() {
+			provider := &ddnsv1alpha1.Provider{}
+			var err error
+
+			clientWrapper := &ClientWrapper{
+				Client:           k8sClient,
+				PatchStatusError: fmt.Errorf("cannot patch status"),
+				PatchStatusIndex: 4,
+			}
+
+			controllerReconciler := &ProviderReconciler{
+				Client: clientWrapper,
+				Scheme: clientWrapper.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{
+						IP: dummyIp,
+					}, nil
+				},
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("cannot patch status"))
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should not reconcile if we cannot patch the provider ip status after setting the ip in the provider", func() {
+			provider := &ddnsv1alpha1.Provider{}
+			var err error
+
+			clientWrapper := &ClientWrapper{
+				Client:           k8sClient,
+				PatchStatusError: fmt.Errorf("cannot patch status"),
+				PatchStatusIndex: 5,
+			}
+
+			controllerReconciler := &ProviderReconciler{
+				Client: clientWrapper,
+				Scheme: clientWrapper.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{
+						IP: "1.1.1.1",
+					}, nil
+				},
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("cannot patch status"))
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 })
