@@ -46,7 +46,7 @@ controller:
   # Arguments to pass to the controller manager.
   replicas: 1
   args:
-    - --leader-elect
+    - --leader-elect # Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.
     - --health-probe-bind-address=:8081
 
 resources: {}

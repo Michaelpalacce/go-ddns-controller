@@ -3,6 +3,7 @@ IMG ?= ghcr.io/michaelpalacce/go-ddns-controller:latest
 REPOSITORY = $(shell echo ${IMG} | cut -d: -f1)
 VERSION ?= $(shell echo ${IMG} | cut -d: -f2)
 REPLICAS ?= 1
+ARGS ?= --leader-elect,--health-probe-bind-address=:8081
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.30.0
@@ -57,6 +58,7 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) rbac:roleName=go-ddns-cluster-manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases && \
 	cp config/crd/bases/* charts/go-ddns-controller/crds && \
 	cp config/rbac/role.yaml charts/go-ddns-controller/templates/role.yaml
+	cp config/rbac/leader_election_role.yaml charts/go-ddns-controller/templates/leader_election_role.yaml
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -165,7 +167,8 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified. U
 		--namespace go-ddns-controller-system \
 		--set image.repository=${REPOSITORY} \
 		--set image.tag=${VERSION} \
-		--set controller.replicas=${REPLICAS}
+		--set controller.replicas=${REPLICAS} \
+		--set controller.args=\{${ARGS}\}
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
