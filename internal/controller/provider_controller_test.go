@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	. "github.com/onsi/ginkgo/v2"
@@ -123,7 +124,7 @@ var _ = Describe("Provider Controller", func() {
 						Name:          "Cloudflare",
 						SecretName:    secretNamespacedName.Name,
 						ConfigMap:     configMapNamespacedName.Name,
-						RetryInterval: 900,
+						RetryInterval: 123,
 						NotifierRefs:  []ddnsv1alpha1.ResourceRef{},
 					},
 					Status: ddnsv1alpha1.ProviderStatus{},
@@ -172,6 +173,20 @@ var _ = Describe("Provider Controller", func() {
 
 			err = k8sClient.Get(ctx, providerNamespacedName, provider)
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should successfully requeue the reqeust for an interval equal to the spec", func() {
+			By("Reconciling the created resource")
+
+			provider := &ddnsv1alpha1.Provider{}
+
+			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeTrue())
+			Expect(result.RequeueAfter).To(Equal(time.Second * 123))
 		})
 
 		It("should set correct conditions", func() {
@@ -264,7 +279,7 @@ var _ = Describe("Provider Controller", func() {
 			Expect(provider.Status.ProviderIP).To(Equal(dummyIp))
 		})
 
-		It("should set correct IPs if ProviderIP is different", func() {
+		It("should set correct IPs if called multiple times", func() {
 			By("Reconciling the created resource")
 
 			calledCounter := 0
@@ -282,7 +297,6 @@ var _ = Describe("Provider Controller", func() {
 						SetIPInterceptor: func(ip string) {
 							calledCounter++
 
-							Expect(calledCounter).To(Equal(1))
 							Expect(ip).To(Equal(dummyIp))
 						},
 					}, nil
@@ -297,6 +311,17 @@ var _ = Describe("Provider Controller", func() {
 
 			Expect(provider.Status.PublicIP).To(Equal(dummyIp))
 			Expect(provider.Status.ProviderIP).To(Equal(dummyIp))
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(provider.Status.PublicIP).To(Equal(dummyIp))
+			Expect(provider.Status.ProviderIP).To(Equal(dummyIp))
+
+			Expect(calledCounter).To(Equal(2))
 		})
 
 		It("should change ProviderIP if the PublicIP changes", func() {
@@ -355,7 +380,6 @@ var _ = Describe("Provider Controller", func() {
 						SetIPInterceptor: func(ip string) {
 							calledCounter++
 
-							Expect(calledCounter).To(Equal(1))
 							Expect(ip).To(Equal(dummyIp))
 						},
 					}, nil
@@ -370,6 +394,8 @@ var _ = Describe("Provider Controller", func() {
 
 			Expect(provider.Status.PublicIP).To(Equal(dummyIp))
 			Expect(provider.Status.ProviderIP).To(Equal(dummyIp))
+
+			Expect(calledCounter).To(Equal(1))
 		})
 
 		It("should not reconcile with unexisting configMap", func() {
@@ -679,6 +705,52 @@ var _ = Describe("Provider Controller", func() {
 
 			err = k8sClient.Get(ctx, providerNamespacedName, provider)
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should not reconcile if we cannot patch the observed generation", func() {
+			provider := &ddnsv1alpha1.Provider{}
+			var err error
+
+			clientWrapper := &ClientWrapper{
+				Client:           k8sClient,
+				PatchStatusError: fmt.Errorf("cannot patch status"),
+				PatchStatusIndex: 6,
+			}
+
+			controllerReconciler := &ProviderReconciler{
+				Client: clientWrapper,
+				Scheme: clientWrapper.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{
+						IP: "1.1.1.1",
+					}, nil
+				},
+			}
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: providerNamespacedName})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(Equal("cannot patch status"))
+
+			err = k8sClient.Get(ctx, providerNamespacedName, provider)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should ignore provider not found errors", func() {
+			unexistingNamespacedName := types.NamespacedName{
+				Name:      "unexisting-provider",
+				Namespace: "default",
+			}
+			provider := &ddnsv1alpha1.Provider{}
+			var err error
+
+			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: unexistingNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			err = k8sClient.Get(ctx, unexistingNamespacedName, provider)
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })

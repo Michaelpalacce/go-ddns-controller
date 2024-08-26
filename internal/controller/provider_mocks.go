@@ -30,9 +30,26 @@ func (c MockClient) SetIp(ip string) error {
 
 type ClientWrapper struct {
 	client.Client
+
 	PatchStatusError   error
 	PatchStatusIndex   int // When to fail the PatchStatus
 	CurrentStatusIndex int
+
+	GetError        error
+	GetIndex        int
+	CurrentGetIndex int
+}
+
+func (c *ClientWrapper) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if c.GetError != nil {
+		if c.CurrentGetIndex == c.GetIndex {
+			return c.GetError
+		}
+
+		c.CurrentGetIndex++
+	}
+
+	return c.Client.Get(ctx, key, obj, opts...)
 }
 
 func (c *ClientWrapper) Status() client.StatusWriter {
