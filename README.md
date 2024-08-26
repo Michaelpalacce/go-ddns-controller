@@ -177,10 +177,10 @@ make undeploy
 To build the project, run the following command:
 
 ```sh
-make all-gen
+make release-prepare
 ```
 
-This command will generate the all needed manifests, build the `dist/install.yaml` .
+This command will generate the all needed manifests and prepare parts of the helm chart.
 
 ### Running the tests
 
@@ -194,25 +194,16 @@ This command will run the tests and generate a coverage report. The coverage rep
 
 ## Project Distribution
 
-Following are the steps to build the installer and distribute this project to users.
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=ghcr.io/michaelpalacce/go-ddns-controller:latest
-```
-
-NOTE: The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without
-its dependencies.
-
-2. Using the installer
-
-Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
+The helm chart is located in the `chart` directory. The chart is used to deploy the controller to a Kubernetes cluster.
+Take a look at the `values.yaml` file to see the default values for the chart.
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/Michaelpalacce/go-ddns-controller/master/dist/install.yaml
+helm upgrade --install go-ddns-controller charts/go-ddns-controller \
+    --create-namespace \
+    --namespace go-ddns-controller-system \
+    --set image.repository=${REPOSITORY} \
+    --set image.tag=${VERSION} \
+    --set controller.replicas=${REPLICAS}
 ```
 
 ## Contributing

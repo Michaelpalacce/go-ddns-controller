@@ -7,7 +7,7 @@ metadata:
     {{- include "go-ddns-controller.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.controller.replicas }}
   {{- end }}
   selector:
     matchLabels:
@@ -50,8 +50,9 @@ spec:
           command: 
             - /manager
           args:
-            # - --leader-elect # @TODO: not sure how to make this work, yet
-            - --health-probe-bind-address=:8081
+            {{- if .Values.controller.args }}
+            {{- toYaml .Values.controller.args | nindent 12 }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz

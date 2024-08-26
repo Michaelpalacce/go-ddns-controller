@@ -1,5 +1,9 @@
 # Image URL to use all building/pushing image targets
 IMG ?= ghcr.io/michaelpalacce/go-ddns-controller:latest
+REPOSITORY = $(shell echo ${IMG} | cut -d: -f1)
+VERSION ?= $(shell echo ${IMG} | cut -d: -f2)
+REPLICAS ?= 1
+
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.30.0
 
@@ -41,6 +45,11 @@ all: build
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
+##@ Release
+
+.PHONY: release-prepare
+release-prepare: manifests generate ## Generate all manifests and installers.
+
 ##@ Development
 
 .PHONY: manifests
@@ -52,9 +61,6 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-.PHONY: all-gen
-all-gen: manifests generate build-installer ## Generate all manifests and installers.
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -72,10 +78,9 @@ test: manifests generate fmt vet envtest ## Run tests.
 coverage: test ## Run tests and generate coverage report.
 	go tool cover -html=cover.out
 
-# Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
-.PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
+.PHONY: test-e2e
 test-e2e:
-	go test ./test/e2e/ -v -ginkgo.v
+	go test ./test/e2e/ -v -ginkgo.v ## Run the e2e tests against a Kind k8s instance that is spun up.
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
@@ -123,12 +128,6 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	- $(CONTAINER_TOOL) buildx rm go-ddns-controller-builder
 	rm Dockerfile.cross
 
-.PHONY: build-installer
-build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
-	mkdir -p dist
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default > dist/install.yaml
-
 ##@ Deployment
 
 ifndef ignore-not-found
@@ -148,7 +147,7 @@ kind-load: docker-build ## Load the image into the Kind cluster.
 	kind load docker-image ${IMG}
 
 .PHONY: kind-deploy
-kind-deploy: kind-load all-gen install deploy ## Deploy the controller to the Kind cluster.
+kind-deploy: kind-load release-prepare install deploy ## Deploy the controller to the Kind cluster.
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
@@ -158,14 +157,19 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
+# @TODO: Add a target to install the Helm chart
 .PHONY: deploy
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
+deploy: manifests kustomize ## Deploy controller to the K8s cluster specified. Uses Helm to deploy the controller.
+	$(HELM) upgrade --install go-ddns-controller charts/go-ddns-controller \
+		--create-namespace \
+		--namespace go-ddns-controller-system \
+		--set image.repository=${REPOSITORY} \
+		--set image.tag=${VERSION} \
+		--set controller.replicas=${REPLICAS}
 
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+	$(HELM) uninstall go-ddns-controller --namespace go-ddns-controller-system
 
 ##@ Dependencies
 
@@ -180,6 +184,7 @@ KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+HELM ?= helm
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.4.2
