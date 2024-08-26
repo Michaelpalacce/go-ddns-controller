@@ -54,7 +54,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: all-gen
-all-gen: manifests generate build-installer
+all-gen: manifests generate build-installer ## Generate all manifests and installers.
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
