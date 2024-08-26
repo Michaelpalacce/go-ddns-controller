@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -34,48 +35,102 @@ import (
 var _ = PDescribe("Notifier Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
-
-		ctx := context.Background()
-
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
-		}
 		notifier := &ddnsv1alpha1.Notifier{}
+		ctx := context.Background()
+		var controllerReconciler *NotifierReconciler
+
+		notifierNamespacedName := types.NamespacedName{
+			Name:      "test-notifier",
+			Namespace: "default",
+		}
+
+		configMapNamespacedName := types.NamespacedName{
+			Name:      "webhook-config",
+			Namespace: "default",
+		}
+
+		secretNamespacedName := types.NamespacedName{
+			Name:      "webhook-secret",
+			Namespace: "default",
+		}
 
 		BeforeEach(func() {
+			var err error
+
+			By("creating the ConfigMap for the Provider")
+			err = k8sClient.Get(ctx, configMapNamespacedName, &corev1.ConfigMap{})
+			if err != nil && errors.IsNotFound(err) {
+				resource := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      configMapNamespacedName.Name,
+						Namespace: configMapNamespacedName.Namespace,
+					},
+					Data: map[string]string{
+						"config": "",
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			} else {
+				Expect(err).NotTo(HaveOccurred())
+			}
+
+			By("creating the Secret for the Provider")
+			err = k8sClient.Get(ctx, secretNamespacedName, &corev1.Secret{})
+			if err != nil && errors.IsNotFound(err) {
+				resource := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      secretNamespacedName.Name,
+						Namespace: secretNamespacedName.Namespace,
+					},
+					StringData: map[string]string{
+						"url": "https://dummy.url",
+					},
+				}
+
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			} else {
+				Expect(err).NotTo(HaveOccurred())
+			}
+
 			By("creating the custom resource for the Kind Notifier")
-			err := k8sClient.Get(ctx, typeNamespacedName, notifier)
+			err = k8sClient.Get(ctx, notifierNamespacedName, notifier)
 			if err != nil && errors.IsNotFound(err) {
 				resource := &ddnsv1alpha1.Notifier{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
+						Name:      notifierNamespacedName.Name,
+						Namespace: notifierNamespacedName.Namespace,
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: ddnsv1alpha1.NotifierSpec{
+						Name:       "Webhook",
+						SecretName: secretNamespacedName.Name,
+						ConfigMap:  configMapNamespacedName.Name,
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			}
+
+			By("creating the ProviderReconciler")
+			controllerReconciler = &NotifierReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
 			}
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
 			resource := &ddnsv1alpha1.Notifier{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+			err := k8sClient.Get(ctx, notifierNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Cleanup the specific resource instance Notifier")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
+
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &NotifierReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
+				NamespacedName: notifierNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
 			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.

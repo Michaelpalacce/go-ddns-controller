@@ -62,8 +62,8 @@ var _ = Describe("Provider Controller", func() {
 
 		BeforeEach(func() {
 			var err error
-			By("creating the ConfigMap for the Provider")
 
+			By("creating the ConfigMap for the Provider")
 			err = k8sClient.Get(ctx, configMapNamespacedName, &corev1.ConfigMap{})
 			if err != nil && errors.IsNotFound(err) {
 				resource := &corev1.ConfigMap{
