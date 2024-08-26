@@ -135,6 +135,21 @@ ifndef ignore-not-found
   ignore-not-found = false
 endif
 
+.PHONY: kind-create
+kind-create: ## Create a Kind cluster.
+	kind create cluster --config hack/kind-config.yaml --image=kindest/node:v1.30.4
+
+.PHONY: kind-delete
+kind-delete: ## Delete the Kind cluster.
+	kind delete cluster
+
+.PHONY: kind-load
+kind-load: docker-build ## Load the image into the Kind cluster.
+	kind load docker-image ${IMG}
+
+.PHONY: kind-deploy
+kind-deploy: kind-load all-gen install deploy ## Deploy the controller to the Kind cluster.
+
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
