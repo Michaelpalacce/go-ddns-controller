@@ -172,6 +172,26 @@ make uninstall
 make undeploy
 ```
 
+### Building the project
+
+To build the project, run the following command:
+
+```sh
+make all-gen
+```
+
+This command will generate the all needed manifests, build the `dist/install.yaml` .
+
+### Running the tests
+
+To run the tests, run the following command:
+
+```sh
+make coverage
+```
+
+This command will run the tests and generate a coverage report. The coverage report will automatically be visualized in the browser.
+
 ## Project Distribution
 
 Following are the steps to build the installer and distribute this project to users.

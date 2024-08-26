@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -751,6 +752,27 @@ var _ = Describe("Provider Controller", func() {
 
 			err = k8sClient.Get(ctx, unexistingNamespacedName, provider)
 			Expect(err).To(HaveOccurred())
+		})
+
+		It("should return a new manager when SetupWithManager is called", func() {
+			mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{})
+
+			Expect(err).NotTo(HaveOccurred())
+
+			controllerReconciler := &ProviderReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+				IPProvider: func() (string, error) {
+					return dummyIp, nil
+				},
+				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
+					return MockClient{}, nil
+				},
+			}
+
+			err = controllerReconciler.SetupWithManager(mgr)
+
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })
