@@ -1,3 +1,2 @@
 resources:
 - role.yaml
-- leader_election_role.yaml
