@@ -58,7 +58,6 @@ manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and Cust
 	$(CONTROLLER_GEN) rbac:roleName=go-ddns-cluster-manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases && \
 	cp config/crd/bases/* charts/go-ddns-controller/crds && \
 	cp config/rbac/role.yaml charts/go-ddns-controller/templates/role.yaml
-	cp config/rbac/leader_election_role.yaml charts/go-ddns-controller/templates/leader_election_role.yaml
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
