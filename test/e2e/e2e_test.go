@@ -79,11 +79,13 @@ var _ = Describe("controller", Ordered, func() {
 			_, err = utils.Run(cmd)
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
+			By("validating that the go-ddns-controller pod is running as expected with leader election enabled")
 			EventuallyWithOffset(1, verifyControllerUp(3), time.Minute, time.Second).Should(Succeed())
 		})
 	})
 })
 
+// verifyControllerUp returns a function that verifies the controller pods are up and running
 func verifyControllerUp(podCount int) func() error {
 	return func() error {
 		// Get pod name
