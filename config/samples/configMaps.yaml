@@ -1,0 +1,34 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cloudflare-config
+  namespace: go-ddns-controller-system
+  labels:
+    app.kubernetes.io/name: go-ddns-controller
+    app.kubernetes.io/managed-by: kustomize
+data:
+  config: |
+      {
+          "cloudflare": {
+              "zones": [
+                  {
+                      "name": "stefangenov.site",
+                      "records": [
+                          {
+                              "name": "stefangenov.site",
+                              "proxied": true
+                          }
+                      ]
+                  }
+              ]
+          }
+      }
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: webhook-config
+  namespace: go-ddns-controller-system
+data:
+  config: ""

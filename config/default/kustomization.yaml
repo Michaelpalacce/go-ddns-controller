@@ -17,9 +17,9 @@ namePrefix: go-ddns-controller-
 resources:
 - ../crd
 - ../rbac
-- ../manager
 # [METRICS] Expose the controller manager metrics service.
 - metrics_service.yaml
+- ../samples
 
 patches:
 # [METRICS] The following patch will enable the metrics endpoint using HTTPS and the port :8443.

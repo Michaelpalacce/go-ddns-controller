@@ -1,0 +1,5 @@
+resources:
+  - configMaps.yaml
+  - secrets.yaml
+  - provider.yaml
+  - notifier.yaml
