@@ -62,6 +62,9 @@ type NotifierStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Name",type=string,JSONPath=`.spec.name`
+// +kubebuilder:printcolumn:name="Secret",type=string,JSONPath=`.spec.secretName`
+// +kubebuilder:printcolumn:name="ConfigMap",type=string,JSONPath=`.spec.configMap`
 
 // Notifier is the Schema for the notifiers API
 type Notifier struct {

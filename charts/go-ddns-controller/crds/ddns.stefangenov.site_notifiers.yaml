@@ -14,7 +14,17 @@ spec:
     singular: notifier
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.name
+      name: Name
+      type: string
+    - jsonPath: .spec.secretName
+      name: Secret
+      type: string
+    - jsonPath: .spec.configMap
+      name: ConfigMap
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Notifier is the Schema for the notifiers API
