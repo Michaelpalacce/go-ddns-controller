@@ -30,6 +30,9 @@ podLabels: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
+metrics:
+  enabled: false
+
 securityContext: {}
   # capabilities:
   #   drop:
