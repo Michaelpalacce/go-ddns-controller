@@ -70,8 +70,13 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("unable to fetch notifier: %w", err)
 	}
 
-	if err := r.MarkAsReady(ctx, notifier, notifierClient, log); err != nil {
-		return ctrl.Result{}, fmt.Errorf("unable to mark Notifier as ready: %w", err)
+	fmt.Println(notifier.Status.IsReady)
+	if !notifier.Status.IsReady {
+		if err := r.MarkAsReady(ctx, notifier, notifierClient, log); err != nil {
+			return ctrl.Result{}, fmt.Errorf("unable to mark Notifier as ready: %w", err)
+		}
+
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	providers := &ddnsv1alpha1.ProviderList{}
@@ -112,30 +117,26 @@ func (r *NotifierReconciler) MarkAsReady(
 	notifierClient notifiers.Notifier,
 	log logr.Logger,
 ) (err error) {
-	if !notifier.Status.IsReady {
-		condition := metav1.Condition{
-			Type:   notifierConditions.ClientConditionType,
-			Reason: notifierConditions.ClientCommunication,
-		}
+	condition := metav1.Condition{
+		Type:   notifierConditions.ClientConditionType,
+		Reason: notifierConditions.ClientCommunication,
+	}
 
-		if err = notifierClient.SendGreetings(notifier); err != nil {
-			log.Error(err, "unable to send greetings")
-			condition.Message = fmt.Sprintf("unable to send greetings: %s", err)
-			condition.Status = metav1.ConditionFalse
-
-			_ = r.UpdateConditions(ctx, notifier, condition, log)
-			return err
-		}
-
-		condition.Message = "Communications established"
-		condition.Status = metav1.ConditionTrue
+	if err = notifierClient.SendGreetings(notifier); err != nil {
+		condition.Message = fmt.Sprintf("unable to send greetings: %s", err)
+		condition.Status = metav1.ConditionFalse
 
 		_ = r.UpdateConditions(ctx, notifier, condition, log)
+		return fmt.Errorf("unable to send greetings: %w", err)
+	}
 
-		if err := r.PatchStatus(ctx, notifier, r.updateIsReady(notifier, true), log); err != nil {
-			log.Error(err, "unable to mark Notifier as ready")
-			return err
-		}
+	condition.Message = "Communications established"
+	condition.Status = metav1.ConditionTrue
+
+	_ = r.UpdateConditions(ctx, notifier, condition, log)
+
+	if err := r.PatchStatus(ctx, notifier, r.updateIsReady(notifier, true), log); err != nil {
+		return fmt.Errorf("unable to mark Notifier as ready: %w", err)
 	}
 
 	return nil

@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
+	notifierConditions "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/notifier/conditions"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/notifiers"
 )
 
@@ -143,9 +145,18 @@ var _ = Describe("Notifier Controller", func() {
 			err = k8sClient.Get(ctx, notifierNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(resource.Status.Conditions).To(HaveLen(5))
+			Expect(resource.Status.Conditions).To(HaveLen(3))
+			Expect(resource.Status.Conditions[0].Reason).To(Equal(notifierConditions.ConfigMapFound))
+			Expect(resource.Status.Conditions[0].Type).To(Equal(notifierConditions.ConfigMapConditionType))
+			Expect(resource.Status.Conditions[0].Message).To(Equal(fmt.Sprintf("ConfigMap %s found", configMapNamespacedName.Name)))
+			Expect(resource.Status.Conditions[1].Reason).To(Equal(notifierConditions.SecretFound))
+			Expect(resource.Status.Conditions[1].Type).To(Equal(notifierConditions.SecretConditionType))
+			Expect(resource.Status.Conditions[1].Message).To(Equal(fmt.Sprintf("Secret %s found", secretNamespacedName.Name)))
+			Expect(resource.Status.Conditions[2].Reason).To(Equal(notifierConditions.ClientCommunication))
+			Expect(resource.Status.Conditions[2].Type).To(Equal(notifierConditions.ClientConditionType))
+			Expect(resource.Status.Conditions[2].Message).To(Equal("Communications established"))
 			Expect(resource.Status.IsReady).To(BeTrue())
-			Expect(resource.Status.ObservedGeneration).To(Equal(1))
+			Expect(int(resource.Status.ObservedGeneration)).To(Equal(0))
 			// Expect(resource.Status.ObservedGeneration)
 		})
 	})
