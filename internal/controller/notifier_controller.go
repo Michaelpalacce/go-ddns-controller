@@ -219,14 +219,12 @@ func (r *NotifierReconciler) FetchNotifier(
 
 	configMap, err := r.FetchConfig(ctx, req, notifier, log)
 	if err != nil {
-		log.Error(err, "unable to fetch ConfigMap")
-		return nil, err
+		return nil, fmt.Errorf("unable to fetch ConfigMap: %w", err)
 	}
 
 	secret, err := r.FetchSecret(ctx, req, notifier, log)
 	if err != nil {
-		log.Error(err, "unable to fetch Secret")
-		return nil, err
+		return nil, fmt.Errorf("unable to fetch Secret: %w", err)
 	}
 
 	notifierClient, err := r.NotifierFactory(notifier, secret, configMap)

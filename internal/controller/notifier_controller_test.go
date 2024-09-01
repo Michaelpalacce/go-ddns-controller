@@ -143,7 +143,7 @@ var _ = Describe("Notifier Controller", func() {
 			err = k8sClient.Get(ctx, notifierNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(resource.Status.Conditions).To(HaveLen(4))
+			Expect(resource.Status.Conditions).To(HaveLen(5))
 			Expect(resource.Status.IsReady).To(BeTrue())
 			Expect(resource.Status.ObservedGeneration).To(Equal(1))
 			// Expect(resource.Status.ObservedGeneration)
