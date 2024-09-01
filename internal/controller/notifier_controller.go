@@ -92,13 +92,13 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	for _, provider := range filteredProviders {
 		if provider.Annotations != nil {
 			if err = r.NotifyOfChange(ctx, req, &provider, notifier, notifierClient, log); err != nil {
-				return ctrl.Result{}, fmt.Errorf("unabel to notify of chage: %w", err)
+				return ctrl.Result{}, fmt.Errorf("unabel to notify of change: %w", err)
 			}
 		}
 	}
 
 	if err := r.PatchStatus(ctx, notifier, r.updateObservedGeneration(notifier, notifier.GetGeneration()), log); err != nil {
-		return ctrl.Result{}, fmt.Errorf("uanbel to update Notifier statusL: %w", err)
+		return ctrl.Result{}, fmt.Errorf("uanbel to update Notifier status: %w", err)
 	}
 
 	return ctrl.Result{}, nil
