@@ -6,7 +6,7 @@ type MockNotifier struct {
 	SendGreetingsError          error
 	SendNotificationError       error
 	SendGreetingsInterceptor    func()
-	SendNotificationInterceptor func()
+	SendNotificationInterceptor func(message any)
 }
 
 func (n MockNotifier) SendGreetings(notifier *ddnsv1alpha1.Notifier) error {
@@ -18,7 +18,7 @@ func (n MockNotifier) SendGreetings(notifier *ddnsv1alpha1.Notifier) error {
 
 func (n MockNotifier) SendNotification(message any) error {
 	if n.SendNotificationInterceptor != nil {
-		n.SendNotificationInterceptor()
+		n.SendNotificationInterceptor(message)
 	}
 	return n.SendNotificationError
 }

@@ -94,15 +94,13 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	for _, provider := range filteredProviders {
-		if provider.Annotations != nil {
-			if err = r.NotifyOfChange(ctx, req, &provider, notifier, notifierClient, log); err != nil {
-				return ctrl.Result{}, fmt.Errorf("unabel to notify of change: %w", err)
-			}
+		if err = r.NotifyOfChange(ctx, req, &provider, notifier, notifierClient, log); err != nil {
+			return ctrl.Result{}, fmt.Errorf("unable to notify of change: %w", err)
 		}
 	}
 
 	if err := r.PatchStatus(ctx, notifier, r.updateObservedGeneration(notifier, notifier.GetGeneration()), log); err != nil {
-		return ctrl.Result{}, fmt.Errorf("uanbel to update Notifier status: %w", err)
+		return ctrl.Result{}, fmt.Errorf("unable to update Notifier status: %w", err)
 	}
 
 	return ctrl.Result{}, nil
@@ -174,6 +172,9 @@ func (r *NotifierReconciler) NotifyOfChange(
 	}
 
 	patch := client.MergeFrom(provider.DeepCopy())
+	if provider.Annotations == nil {
+		provider.Annotations = make(map[string]string)
+	}
 	provider.Annotations[annotation] = provider.Status.ProviderIP
 
 	if err := notifierClient.SendNotification(message); err != nil {
