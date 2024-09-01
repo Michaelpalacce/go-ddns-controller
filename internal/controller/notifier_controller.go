@@ -60,7 +60,6 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	notifier := &ddnsv1alpha1.Notifier{}
 
 	if err := r.Get(ctx, req.NamespacedName, notifier); err != nil {
-		log.Error(err, "unable to fetch Notifier")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -68,19 +67,16 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	notifierClient, err := r.FetchNotifier(ctx, req, notifier, log)
 	if err != nil {
-		log.Error(err, "unable to fetch notifier")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("unable to fetch notifier: %w", err)
 	}
 
 	if err := r.MarkAsReady(ctx, notifier, notifierClient, log); err != nil {
-		log.Error(err, "unable to mark Notifier as ready")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("unable to mark Notifier as ready: %w", err)
 	}
 
 	providers := &ddnsv1alpha1.ProviderList{}
 	if err := r.List(ctx, providers); err != nil {
-		log.Error(err, "unable to list Providers")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("unable to list Providers: %w", err)
 	}
 
 	filteredProviders := []ddnsv1alpha1.Provider{}
@@ -96,15 +92,13 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	for _, provider := range filteredProviders {
 		if provider.Annotations != nil {
 			if err = r.NotifyOfChange(ctx, req, &provider, notifier, notifierClient, log); err != nil {
-				log.Error(err, "unable to notify of change")
-				return ctrl.Result{}, err
+				return ctrl.Result{}, fmt.Errorf("unabel to notify of chage: %w", err)
 			}
 		}
 	}
 
 	if err := r.PatchStatus(ctx, notifier, r.updateObservedGeneration(notifier, notifier.GetGeneration()), log); err != nil {
-		log.Error(err, "unable to update Notifier status")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, fmt.Errorf("uanbel to update Notifier statusL: %w", err)
 	}
 
 	return ctrl.Result{}, nil

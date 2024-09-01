@@ -137,8 +137,16 @@ var _ = Describe("Notifier Controller", func() {
 				NamespacedName: notifierNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+
+			By("Checking if the resource has been successfully reconciled")
+			resource := &ddnsv1alpha1.Notifier{}
+			err = k8sClient.Get(ctx, notifierNamespacedName, resource)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(resource.Status.Conditions).To(HaveLen(4))
+			Expect(resource.Status.IsReady).To(BeTrue())
+			Expect(resource.Status.ObservedGeneration).To(Equal(1))
+			// Expect(resource.Status.ObservedGeneration)
 		})
 	})
 })
