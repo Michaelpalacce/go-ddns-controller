@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
+	"github.com/Michaelpalacce/go-ddns-controller/internal/notifiers"
 )
 
 // Pending, need to be implemented
@@ -114,6 +115,9 @@ var _ = Describe("Notifier Controller", func() {
 			controllerReconciler = &NotifierReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
+				NotifierFactory: func(notifier *ddnsv1alpha1.Notifier, secret *corev1.Secret, configMap *corev1.ConfigMap) (notifiers.Notifier, error) {
+					return &MockNotifier{}, nil
+				},
 			}
 		})
 
