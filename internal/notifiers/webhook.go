@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
+	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
 )
 
 type webhookData struct {
@@ -20,7 +20,7 @@ type WebhookNotifier struct {
 }
 
 // SendGreetings sends a greeting message to the webhook
-func (w *WebhookNotifier) SendGreetings(notifier *v1alpha1.Notifier) error {
+func (w *WebhookNotifier) SendGreetings(notifier *ddnsv1alpha1.Notifier) error {
 	err := w.sendToWebhook(fmt.Sprintf("`go-ddns-controller` is starting its watch. From notifier: (%s).", notifier.Name))
 	if err != nil {
 		return err

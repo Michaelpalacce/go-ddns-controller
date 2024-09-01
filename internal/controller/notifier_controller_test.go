@@ -32,7 +32,7 @@ import (
 )
 
 // Pending, need to be implemented
-var _ = PDescribe("Notifier Controller", func() {
+var _ = Describe("Notifier Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 		notifier := &ddnsv1alpha1.Notifier{}
@@ -57,7 +57,7 @@ var _ = PDescribe("Notifier Controller", func() {
 		BeforeEach(func() {
 			var err error
 
-			By("creating the ConfigMap for the Provider")
+			By("creating the ConfigMap for the Notifier")
 			err = k8sClient.Get(ctx, configMapNamespacedName, &corev1.ConfigMap{})
 			if err != nil && errors.IsNotFound(err) {
 				resource := &corev1.ConfigMap{
@@ -75,7 +75,7 @@ var _ = PDescribe("Notifier Controller", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			By("creating the Secret for the Provider")
+			By("creating the Secret for the Notifier")
 			err = k8sClient.Get(ctx, secretNamespacedName, &corev1.Secret{})
 			if err != nil && errors.IsNotFound(err) {
 				resource := &corev1.Secret{

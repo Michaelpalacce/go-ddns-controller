@@ -39,6 +39,7 @@ import (
 	"github.com/Michaelpalacce/go-ddns-controller/internal/clients"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/controller"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/network"
+	"github.com/Michaelpalacce/go-ddns-controller/internal/notifiers"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -156,8 +157,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err = (&controller.NotifierReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		NotifierFactory: notifiers.NotifierFactory,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Notifier")
 		os.Exit(1)

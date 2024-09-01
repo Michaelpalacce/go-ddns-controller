@@ -42,7 +42,8 @@ import (
 // NotifierReconciler reconciles a Notifier object
 type NotifierReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme          *runtime.Scheme
+	NotifierFactory func(notifier *ddnsv1alpha1.Notifier, secret *corev1.Secret, configMap *corev1.ConfigMap) (notifiers.Notifier, error)
 }
 
 // +kubebuilder:rbac:groups=ddns.stefangenov.site,resources=notifiers,verbs=get;list;watch;create;update;patch;delete
@@ -234,7 +235,7 @@ func (r *NotifierReconciler) FetchNotifier(
 		return nil, err
 	}
 
-	notifierClient, err := r.CreateNotifier(ctx, notifier, secret, configMap)
+	notifierClient, err := r.NotifierFactory(notifier, secret, configMap)
 	if err != nil {
 		message = fmt.Sprintf("could not create client: %s", err)
 		status = metav1.ConditionFalse
@@ -253,26 +254,6 @@ func (r *NotifierReconciler) FetchNotifier(
 	_ = r.UpdateConditions(ctx, notifier, condition, log)
 
 	return notifierClient, err
-}
-
-func (r *NotifierReconciler) CreateNotifier(
-	ctx context.Context,
-	notifier *ddnsv1alpha1.Notifier,
-	secret *corev1.Secret,
-	configMap *corev1.ConfigMap,
-) (notifiers.Notifier, error) {
-	switch notifier.Spec.Name {
-	case notifiers.Webhook:
-		if secret.Data["url"] == nil {
-			return nil, fmt.Errorf("`url` not found in secret")
-		}
-
-		return &notifiers.WebhookNotifier{
-			Url: string(secret.Data["url"]),
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknown notifier %s", notifier.Spec.Name)
-	}
 }
 
 func (r *NotifierReconciler) FetchConfig(
