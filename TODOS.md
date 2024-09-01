@@ -1,20 +1,22 @@
-Prepartion for v1.0.0 checklist
+# v1.0.0 Checklist
 
-# Public IP Fetcher
+## Public IP Fetcher
 
 - [ ] New CRD that is meant to fetch the public IP address of the cluster. The CRD will be updated by a controller on intervals. If a change is detected, the providers will be trigerred and updated.
 
-# Tests
+## Tests
 
 - [ ] Finalize e2e tests. Use gitignored secrets for the tests to connect to the DNS provider. Create a local webhook for tests.
 - [ ] Write unit tests for the notifier
 - [ ] Unit test the Provider Clients
 
-# Documentation
+## Documentation
 
 - [ ] Write better documentation in a `docs` folder perhaps?
 
-# Notifiers
+# General Checklist
+
+## Notifiers
 
 - [ ] Add Telegram as an available notifier
 - [ ] Add Slack as an available notifier
@@ -23,7 +25,7 @@ Prepartion for v1.0.0 checklist
 - [ ] Add Email as an available notifier
 - [ ] Integrate apprise as a notifier
 
-# Providers
+## Providers
 
 - [ ] Add DuckDNS as an available provider
 - [ ] Add DigitalOcean as an available provider
