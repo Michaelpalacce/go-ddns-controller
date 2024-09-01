@@ -70,7 +70,6 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, fmt.Errorf("unable to fetch notifier: %w", err)
 	}
 
-	fmt.Println(notifier.Status.IsReady)
 	if !notifier.Status.IsReady {
 		if err := r.MarkAsReady(ctx, notifier, notifierClient, log); err != nil {
 			return ctrl.Result{}, fmt.Errorf("unable to mark Notifier as ready: %w", err)

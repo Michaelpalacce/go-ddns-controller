@@ -140,7 +140,7 @@ var _ = Describe("Notifier Controller", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Checking if the resource has been successfully reconciled")
+			By("Marking the notifier as ready")
 			resource := &ddnsv1alpha1.Notifier{}
 			err = k8sClient.Get(ctx, notifierNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
@@ -157,7 +157,23 @@ var _ = Describe("Notifier Controller", func() {
 			Expect(resource.Status.Conditions[2].Message).To(Equal("Communications established"))
 			Expect(resource.Status.IsReady).To(BeTrue())
 			Expect(int(resource.Status.ObservedGeneration)).To(Equal(0))
-			// Expect(resource.Status.ObservedGeneration)
+		})
+
+		PIt("should successfully reconcile the resource and send a notification", func() {
+			By("Reconciling the created resource")
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: notifierNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Checking if the resource has been successfully reconciled")
+			resource := &ddnsv1alpha1.Notifier{}
+			err = k8sClient.Get(ctx, notifierNamespacedName, resource)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resource.Status.IsReady).To(BeTrue())
+
+			By("Sending a notification due to a change")
 		})
 	})
 })
