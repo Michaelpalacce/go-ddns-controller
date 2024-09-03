@@ -5,8 +5,12 @@ import (
 	"fmt"
 
 	"github.com/cloudflare/cloudflare-go"
-	"github.com/go-logr/logr"
 )
+
+type Logger interface {
+	Info(msg string, keysAndValues ...interface{})
+	Error(err error, msg string, keysAndValues ...interface{})
+}
 
 // Record represents one Zone Record
 type Record struct {
@@ -35,12 +39,12 @@ type CloudflareSecret struct {
 type CloudflareClient struct {
 	API    *cloudflare.API
 	Config CloudflareConfig
-	Logger logr.Logger
+	Logger Logger
 }
 
 // NewCloudflareClient creates a new CloudflareClient client
 // It will return an error if the authentication fails
-func NewCloudflareClient(config CloudflareConfig, apiToken string, logger logr.Logger) (*CloudflareClient, error) {
+func NewCloudflareClient(config CloudflareConfig, apiToken string, logger Logger) (*CloudflareClient, error) {
 	api, err := cloudflare.NewWithAPIToken(apiToken)
 	if err != nil {
 		return nil, fmt.Errorf("could not authenticate to Cloudflare with the given token, error was: %s", err)
