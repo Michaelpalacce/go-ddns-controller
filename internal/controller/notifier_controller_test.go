@@ -221,7 +221,7 @@ var _ = Describe("Notifier Controller", func() {
 			controllerReconciler = &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(test string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {

@@ -49,6 +49,10 @@ type ProviderSpec struct {
 	// +kubebuilder:default:=900
 	RetryInterval int64 `json:"retryInterval"`
 
+	// CustomIPProvider is the name of the custom IP provider that should be used to get the IP.
+	// +kubebuilder:validation:Optional
+	CustomIPProvider string `json:"customIPProvider"`
+
 	// Notifiers is a list of notifiers that the provider should use to notify for changes.
 	// +kubebuilder:validation:Optional
 	NotifierRefs []ResourceRef `json:"notifierRefs,omitempty"`

@@ -43,6 +43,10 @@ spec:
                 description: ConfigMap is the name of the config map that holds the
                   provider specific configuration.
                 type: string
+              customIPProvider:
+                description: CustomIPProvider is the name of the custom IP provider
+                  that should be used to get the IP.
+                type: string
               name:
                 description: Name is the name of the provider we want to create.
                 enum:

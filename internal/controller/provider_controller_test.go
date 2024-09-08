@@ -140,7 +140,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler = &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -225,7 +225,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -254,7 +254,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -289,7 +289,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -372,7 +372,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -512,7 +512,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return "", fmt.Errorf("cannot fetch public IP")
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -539,7 +539,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -568,7 +568,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -597,7 +597,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -628,7 +628,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: clientWrapper,
 				Scheme: clientWrapper.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -659,7 +659,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: clientWrapper,
 				Scheme: clientWrapper.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -690,7 +690,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: clientWrapper,
 				Scheme: clientWrapper.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -721,7 +721,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: clientWrapper,
 				Scheme: clientWrapper.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {
@@ -762,7 +762,7 @@ var _ = Describe("Provider Controller", func() {
 			controllerReconciler := &ProviderReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
-				IPProvider: func() (string, error) {
+				IPProvider: func(c string) (string, error) {
 					return dummyIp, nil
 				},
 				ClientFactory: func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error) {

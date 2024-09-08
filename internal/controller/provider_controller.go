@@ -38,7 +38,7 @@ import (
 )
 
 type (
-	IPProvider    func() (string, error)
+	IPProvider    func(string) (string, error)
 	ClientFactory func(name string, secret *corev1.Secret, configMap *corev1.ConfigMap, log logr.Logger) (clients.Client, error)
 )
 
@@ -72,7 +72,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if publicIp, err = r.IPProvider(); err != nil {
+	if publicIp, err = r.IPProvider(provider.Spec.CustomIPProvider); err != nil {
 		return ctrl.Result{}, err
 	}
 
