@@ -24,8 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -35,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
-	providerConditions "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/provider/conditions"
+	"github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/conditions"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/clients"
 )
 
@@ -126,29 +124,26 @@ func (r *ProviderReconciler) fetchSecret(
 	provider *ddnsv1alpha1.Provider,
 ) (*corev1.Secret, error) {
 	var (
-		err     error
-		message string
-		status  metav1.ConditionStatus
-		secret  *corev1.Secret
+		err    error
+		secret *corev1.Secret
 	)
+
+	condOptions := []conditions.ConditionOption{}
 
 	secret = &corev1.Secret{}
 	if err = r.Get(ctx, types.NamespacedName{Name: provider.Spec.SecretName, Namespace: req.Namespace}, secret); err != nil {
-		message = fmt.Sprintf("Secret %s not found", provider.Spec.SecretName)
-		status = metav1.ConditionFalse
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("SecretFound", fmt.Sprintf("could not find secret: %s", err)),
+			conditions.False(),
+		)
 	} else {
-		message = fmt.Sprintf("Secret %s found", provider.Spec.SecretName)
-		status = metav1.ConditionTrue
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("SecretFound", fmt.Sprintf("Secret %s found", provider.Spec.SecretName)),
+			conditions.True(),
+		)
 	}
 
-	condition := metav1.Condition{
-		Type:    providerConditions.SecretConditionType,
-		Reason:  providerConditions.SecretFound,
-		Message: message,
-		Status:  status,
-	}
-
-	r.updateConditions(ctx, provider, condition)
+	r.setConditions(ctx, provider, ddnsv1alpha1.ProviderConditionTypeSecret, condOptions...)
 
 	return secret, err
 }
@@ -161,27 +156,24 @@ func (r *ProviderReconciler) fetchConfig(
 	var (
 		configMap *corev1.ConfigMap
 		err       error
-		message   string
-		status    metav1.ConditionStatus
 	)
+
+	condOptions := []conditions.ConditionOption{}
+
 	configMap = &corev1.ConfigMap{}
-
 	if err = r.Get(ctx, types.NamespacedName{Name: provider.Spec.ConfigMap, Namespace: req.Namespace}, configMap); err != nil {
-		message = fmt.Sprintf("ConfigMap %s not found", provider.Spec.ConfigMap)
-		status = metav1.ConditionFalse
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("ConfigMapFound", fmt.Sprintf("ConfigMap %s not found", provider.Spec.ConfigMap)),
+			conditions.False(),
+		)
 	} else {
-		message = fmt.Sprintf("ConfigMap %s found", provider.Spec.ConfigMap)
-		status = metav1.ConditionTrue
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("ConfigMapFound", fmt.Sprintf("ConfigMap %s found", provider.Spec.ConfigMap)),
+			conditions.True(),
+		)
 	}
 
-	condition := metav1.Condition{
-		Type:    providerConditions.ConfigMapConditionType,
-		Reason:  providerConditions.ConfigMapFound,
-		Message: message,
-		Status:  status,
-	}
-
-	r.updateConditions(ctx, provider, condition)
+	r.setConditions(ctx, provider, ddnsv1alpha1.ProviderConditionTypeConfigMap, condOptions...)
 
 	return configMap, err
 }
@@ -191,12 +183,6 @@ func (r *ProviderReconciler) fetchClient(
 	req ctrl.Request,
 	provider *ddnsv1alpha1.Provider,
 ) (clients.Client, error) {
-	var (
-		err     error
-		message string
-		status  metav1.ConditionStatus
-	)
-
 	secret, err := r.fetchSecret(ctx, req, provider)
 	if err != nil {
 		return nil, err
@@ -207,37 +193,37 @@ func (r *ProviderReconciler) fetchClient(
 		return nil, err
 	}
 
+	condOptions := []conditions.ConditionOption{}
+
 	providerClient, err := r.ClientFactory(provider.Spec.Name, secret, configMap, log.FromContext(ctx))
 	if err != nil {
-		message = fmt.Sprintf("could not create client: %s", err)
-		status = metav1.ConditionFalse
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("ClientCreated", fmt.Sprintf("could not create client: %s", err)),
+			conditions.False(),
+		)
 	} else {
-		message = "Client created"
-		status = metav1.ConditionTrue
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("ClientCreated", "Client created successfully"),
+			conditions.True(),
+		)
 	}
 
-	condition := metav1.Condition{
-		Type:    providerConditions.ClientConditionType,
-		Reason:  providerConditions.ClientCreated,
-		Message: message,
-		Status:  status,
-	}
-
-	r.updateConditions(ctx, provider, condition)
+	r.setConditions(ctx, provider, ddnsv1alpha1.ProviderConditionTypeClient, condOptions...)
 
 	return providerClient, err
 }
 
-func (r *ProviderReconciler) updateConditions(
+func (r *ProviderReconciler) setConditions(
 	ctx context.Context,
 	provider *ddnsv1alpha1.Provider,
-	condition metav1.Condition,
+	conditionType string,
+	options ...conditions.ConditionOption,
 ) {
-	r.patchStatus(ctx, provider, func(provider *ddnsv1alpha1.Provider) bool {
-		condition.ObservedGeneration = provider.GetGeneration()
-
-		return meta.SetStatusCondition(&provider.Status.Conditions, condition)
-	})
+	patch := client.MergeFrom(provider.DeepCopy())
+	options = append(options, conditions.WithObservedGeneration(provider.GetGeneration()))
+	if provider.Conditions().SetCondition(conditionType, options...) {
+		_ = r.Status().Patch(ctx, provider, patch)
+	}
 }
 
 func (r *ProviderReconciler) patchStatus(

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/conditions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -106,4 +107,21 @@ type ProviderList struct {
 
 func init() {
 	SchemeBuilder.Register(&Provider{}, &ProviderList{})
+}
+
+// =================================================== Status ===================================================
+
+const (
+	ProviderConditionTypeClient = "Client"
+
+	ProviderConditionTypeConfigMap = "ConfigMap"
+
+	ProviderConditionTypeSecret = "Secret"
+)
+
+func (p *Provider) Conditions() *conditions.Conditions {
+	return &conditions.Conditions{
+		Conditions:     &p.Status.Conditions,
+		ConditionTypes: []string{ProviderConditionTypeClient, ProviderConditionTypeConfigMap, ProviderConditionTypeSecret},
+	}
 }
