@@ -23,27 +23,25 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	networkingv1 "k8s.io/api/networking/v1"
 )
 
 // IngressReconciler reconciles a Ingress object
+// It is used to watch for changes in Ingresses
 type IngressReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=ddns.stefangenov.site,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=ddns.stefangenov.site,resources=ingresses/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=ddns.stefangenov.site,resources=ingresses/finalizers,verbs=update
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;update;patch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Ingress object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.4/pkg/reconcile
+// Reconcile will reconcile the Ingress object.
+// It must fetch all Ingresses and look for a specific annotation.
+// If that annotation is present, it needs to create a new 'Ingress' object in the same namespace.
+// The provider for that 'Ingress' object must be the one specified in the annotation.
+// The notifiers for that 'Ingress' object must be the ones specified in the annotation.
+// The provider must hold it' secret information, but the configuration will come from the 'Ingress' object.
 func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
@@ -55,7 +53,6 @@ func (r *IngressReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *IngressReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
-		// For().
+		For(&networkingv1.Ingress{}).
 		Complete(r)
 }

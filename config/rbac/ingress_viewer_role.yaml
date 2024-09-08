@@ -1,0 +1,23 @@
+# permissions for end users to view ingresses.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: go-ddns-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: ingress-viewer-role
+rules:
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ddns.stefangenov.site
+  resources:
+  - ingresses/status
+  verbs:
+  - get

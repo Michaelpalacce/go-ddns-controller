@@ -26,9 +26,13 @@ resources:
   kind: Notifier
   path: github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1
   version: v1alpha1
-- controller: true
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
   domain: stefangenov.site
   group: ddns
   kind: Ingress
+  path: github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1
   version: v1alpha1
 version: "3"
