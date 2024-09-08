@@ -1,3 +1,7 @@
+# v2.0.0
+
+- [ ] Use Ingress records directly instead of using configuration files
+
 # Next Steps Checklist
 
 ## Tests
