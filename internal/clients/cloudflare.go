@@ -35,9 +35,15 @@ type CloudflareSecret struct {
 	APIToken string `json:"apiToken"`
 }
 
+type cloudflareApi interface {
+	ZoneIDByName(zoneName string) (string, error)
+	ListDNSRecords(ctx context.Context, zoneID *cloudflare.ResourceContainer, params cloudflare.ListDNSRecordsParams) ([]cloudflare.DNSRecord, *cloudflare.ResultInfo, error)
+	UpdateDNSRecord(ctx context.Context, zoneID *cloudflare.ResourceContainer, params cloudflare.UpdateDNSRecordParams) (cloudflare.DNSRecord, error)
+}
+
 // CloudflareClient is the CloudflareClient client that will support Authentication and setting records
 type CloudflareClient struct {
-	API    *cloudflare.API
+	API    cloudflareApi
 	Config CloudflareConfig
 	Logger Logger
 }
