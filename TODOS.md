@@ -3,7 +3,6 @@
 
 ## Tests
 
-- [ ] Finalize e2e tests. Use gitignored secrets for the tests to connect to the DNS provider. Create a local webhook for tests.
 - [x] Write unit tests for the notifier
 - [ ] Unit test the Provider Clients
 
