@@ -78,11 +78,11 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	if err := r.PatchStatus(ctx, provider, r.patchPublicIp(publicIp)); err != nil {
+	if err := r.patchStatus(ctx, provider, r.patchPublicIp(publicIp)); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if providerClient, err = r.FetchClient(ctx, req, provider); err != nil {
+	if providerClient, err = r.fetchClient(ctx, req, provider); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -90,7 +90,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	if err := r.PatchStatus(ctx, provider, r.patchProviderIp(providerIp)); err != nil {
+	if err := r.patchStatus(ctx, provider, r.patchProviderIp(providerIp)); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -101,12 +101,12 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, err
 		}
 
-		if err := r.PatchStatus(ctx, provider, r.patchProviderIp(provider.Status.PublicIP)); err != nil {
+		if err := r.patchStatus(ctx, provider, r.patchProviderIp(provider.Status.PublicIP)); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
 
-	if err := r.PatchStatus(ctx, provider, r.patchObservedGeneration()); err != nil {
+	if err := r.patchStatus(ctx, provider, r.patchObservedGeneration()); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -116,25 +116,11 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *ProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&ddnsv1alpha1.Provider{}).
-		// WithEventFilter will only trigger the reconcile function if the observed generation is different from the new generation
-		WithEventFilter(predicate.Funcs{
-			UpdateFunc: func(e event.UpdateEvent) bool {
-				newGeneration := e.ObjectNew.GetGeneration()
-				observedGeneration := e.ObjectNew.DeepCopyObject().(*ddnsv1alpha1.Provider).Status.ObservedGeneration
+// =================================================== PRIVATE FUNCTIONS ===================================================
 
-				return observedGeneration != newGeneration
-			},
-		}).
-		Complete(r)
-}
-
-// FetchSecret will fetch the secret from the namespace and set the status of the Provider
+// fetchSecret will fetch the secret from the namespace and set the status of the Provider
 // it will also update the status of the Provider so logic is isolated in this function
-func (r *ProviderReconciler) FetchSecret(
+func (r *ProviderReconciler) fetchSecret(
 	ctx context.Context,
 	req ctrl.Request,
 	provider *ddnsv1alpha1.Provider,
@@ -162,12 +148,12 @@ func (r *ProviderReconciler) FetchSecret(
 		Status:  status,
 	}
 
-	r.UpdateConditions(ctx, provider, condition)
+	r.updateConditions(ctx, provider, condition)
 
 	return secret, err
 }
 
-func (r *ProviderReconciler) FetchConfig(
+func (r *ProviderReconciler) fetchConfig(
 	ctx context.Context,
 	req ctrl.Request,
 	provider *ddnsv1alpha1.Provider,
@@ -195,12 +181,12 @@ func (r *ProviderReconciler) FetchConfig(
 		Status:  status,
 	}
 
-	r.UpdateConditions(ctx, provider, condition)
+	r.updateConditions(ctx, provider, condition)
 
 	return configMap, err
 }
 
-func (r *ProviderReconciler) FetchClient(
+func (r *ProviderReconciler) fetchClient(
 	ctx context.Context,
 	req ctrl.Request,
 	provider *ddnsv1alpha1.Provider,
@@ -211,12 +197,12 @@ func (r *ProviderReconciler) FetchClient(
 		status  metav1.ConditionStatus
 	)
 
-	secret, err := r.FetchSecret(ctx, req, provider)
+	secret, err := r.fetchSecret(ctx, req, provider)
 	if err != nil {
 		return nil, err
 	}
 
-	configMap, err := r.FetchConfig(ctx, req, provider)
+	configMap, err := r.fetchConfig(ctx, req, provider)
 	if err != nil {
 		return nil, err
 	}
@@ -237,24 +223,24 @@ func (r *ProviderReconciler) FetchClient(
 		Status:  status,
 	}
 
-	r.UpdateConditions(ctx, provider, condition)
+	r.updateConditions(ctx, provider, condition)
 
 	return providerClient, err
 }
 
-func (r *ProviderReconciler) UpdateConditions(
+func (r *ProviderReconciler) updateConditions(
 	ctx context.Context,
 	provider *ddnsv1alpha1.Provider,
 	condition metav1.Condition,
 ) {
-	r.PatchStatus(ctx, provider, func(provider *ddnsv1alpha1.Provider) bool {
+	r.patchStatus(ctx, provider, func(provider *ddnsv1alpha1.Provider) bool {
 		condition.ObservedGeneration = provider.GetGeneration()
 
 		return meta.SetStatusCondition(&provider.Status.Conditions, condition)
 	})
 }
 
-func (r *ProviderReconciler) PatchStatus(
+func (r *ProviderReconciler) patchStatus(
 	ctx context.Context,
 	provider *ddnsv1alpha1.Provider,
 	apply func(*ddnsv1alpha1.Provider) bool,
@@ -268,6 +254,26 @@ func (r *ProviderReconciler) PatchStatus(
 
 	return nil
 }
+
+// =================================================== SETUP FUNCTIONS ===================================================
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *ProviderReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&ddnsv1alpha1.Provider{}).
+		// WithEventFilter will only trigger the reconcile function if the observed generation is different from the new generation
+		WithEventFilter(predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				newGeneration := e.ObjectNew.GetGeneration()
+				observedGeneration := e.ObjectNew.DeepCopyObject().(*ddnsv1alpha1.Provider).Status.ObservedGeneration
+
+				return observedGeneration != newGeneration
+			},
+		}).
+		Complete(r)
+}
+
+// =================================================== PATCH FUNCTIONS ===================================================
 
 func (p ProviderReconciler) patchProviderIp(providerIp string) func(provider *ddnsv1alpha1.Provider) bool {
 	return func(provider *ddnsv1alpha1.Provider) bool {
