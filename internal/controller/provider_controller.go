@@ -74,8 +74,6 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	log.Info("Provider triggered")
-
 	if publicIp, err = r.IPProvider(); err != nil {
 		return ctrl.Result{}, err
 	}

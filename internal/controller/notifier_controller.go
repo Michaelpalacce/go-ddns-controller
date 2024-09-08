@@ -36,7 +36,6 @@ import (
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
 	notifierConditions "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/notifier/conditions"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/notifiers"
-	"github.com/go-logr/logr"
 )
 
 // NotifierReconciler reconciles a Notifier object
@@ -55,23 +54,19 @@ type NotifierReconciler struct {
 
 // Reconcile will reconcile the Notifier object
 func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
-
 	notifier := &ddnsv1alpha1.Notifier{}
 
 	if err := r.Get(ctx, req.NamespacedName, notifier); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	log.Info("Notifier triggered")
-
-	notifierClient, err := r.FetchNotifier(ctx, req, notifier, log)
+	notifierClient, err := r.FetchNotifier(ctx, req, notifier)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to fetch notifier: %w", err)
 	}
 
 	if !notifier.Status.IsReady {
-		if err := r.MarkAsReady(ctx, notifier, notifierClient, log); err != nil {
+		if err := r.MarkAsReady(ctx, notifier, notifierClient); err != nil {
 			return ctrl.Result{}, fmt.Errorf("unable to mark Notifier as ready: %w", err)
 		}
 
@@ -94,12 +89,12 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	for _, provider := range filteredProviders {
-		if err = r.NotifyOfChange(ctx, req, &provider, notifier, notifierClient, log); err != nil {
+		if err = r.NotifyOfChange(ctx, req, &provider, notifier, notifierClient); err != nil {
 			return ctrl.Result{}, fmt.Errorf("unable to notify of change: %w", err)
 		}
 	}
 
-	if err := r.PatchStatus(ctx, notifier, r.updateObservedGeneration(notifier, notifier.GetGeneration()), log); err != nil {
+	if err := r.PatchStatus(ctx, notifier, r.updateObservedGeneration(notifier.GetGeneration())); err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to update Notifier status: %w", err)
 	}
 
@@ -112,7 +107,6 @@ func (r *NotifierReconciler) MarkAsReady(
 	ctx context.Context,
 	notifier *ddnsv1alpha1.Notifier,
 	notifierClient notifiers.Notifier,
-	log logr.Logger,
 ) (err error) {
 	condition := metav1.Condition{
 		Type:   notifierConditions.ClientConditionType,
@@ -123,16 +117,16 @@ func (r *NotifierReconciler) MarkAsReady(
 		condition.Message = fmt.Sprintf("unable to send greetings: %s", err)
 		condition.Status = metav1.ConditionFalse
 
-		_ = r.UpdateConditions(ctx, notifier, condition, log)
+		r.UpdateConditions(ctx, notifier, condition)
 		return fmt.Errorf("unable to send greetings: %w", err)
 	}
 
 	condition.Message = "Communications established"
 	condition.Status = metav1.ConditionTrue
 
-	_ = r.UpdateConditions(ctx, notifier, condition, log)
+	r.UpdateConditions(ctx, notifier, condition)
 
-	if err := r.PatchStatus(ctx, notifier, r.updateIsReady(notifier, true), log); err != nil {
+	if err := r.PatchStatus(ctx, notifier, r.updateIsReady(true)); err != nil {
 		return fmt.Errorf("unable to mark Notifier as ready: %w", err)
 	}
 
@@ -148,8 +142,8 @@ func (r *NotifierReconciler) NotifyOfChange(
 	provider *ddnsv1alpha1.Provider,
 	notifier *ddnsv1alpha1.Notifier,
 	notifierClient notifiers.Notifier,
-	log logr.Logger,
 ) error {
+	log := log.FromContext(ctx)
 	annotation := fmt.Sprintf("%s/%s_%s", ddnsv1alpha1.GroupVersion.Group, req.Name, req.Namespace)
 	if value, ok := provider.Annotations[annotation]; ok && value == provider.Status.ProviderIP {
 		log.Info("Provider IP has not changed", "IP", provider.Status.ProviderIP)
@@ -180,7 +174,7 @@ func (r *NotifierReconciler) NotifyOfChange(
 	if err := notifierClient.SendNotification(message); err != nil {
 		log.Error(err, "unable to send notification")
 
-		if err := r.PatchStatus(ctx, notifier, r.updateIsReady(notifier, false), log); err != nil {
+		if err := r.PatchStatus(ctx, notifier, r.updateIsReady(false)); err != nil {
 			log.Error(err, "unable to mark Notifier as not ready")
 		}
 
@@ -191,9 +185,7 @@ func (r *NotifierReconciler) NotifyOfChange(
 			Status:  metav1.ConditionFalse,
 		}
 
-		if err := r.UpdateConditions(ctx, notifier, condition, log); err != nil {
-			log.Error(err, "unable to update Notifier conditions")
-		}
+		r.UpdateConditions(ctx, notifier, condition)
 
 		return err
 	}
@@ -210,7 +202,6 @@ func (r *NotifierReconciler) FetchNotifier(
 	ctx context.Context,
 	req ctrl.Request,
 	notifier *ddnsv1alpha1.Notifier,
-	log logr.Logger,
 ) (notifiers.Notifier, error) {
 	var (
 		err     error
@@ -218,12 +209,12 @@ func (r *NotifierReconciler) FetchNotifier(
 		status  metav1.ConditionStatus
 	)
 
-	configMap, err := r.FetchConfig(ctx, req, notifier, log)
+	configMap, err := r.FetchConfig(ctx, req, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch ConfigMap: %w", err)
 	}
 
-	secret, err := r.FetchSecret(ctx, req, notifier, log)
+	secret, err := r.FetchSecret(ctx, req, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch Secret: %w", err)
 	}
@@ -244,7 +235,7 @@ func (r *NotifierReconciler) FetchNotifier(
 		Status:  status,
 	}
 
-	_ = r.UpdateConditions(ctx, notifier, condition, log)
+	r.UpdateConditions(ctx, notifier, condition)
 
 	return notifierClient, err
 }
@@ -253,7 +244,6 @@ func (r *NotifierReconciler) FetchConfig(
 	ctx context.Context,
 	req ctrl.Request,
 	notifier *ddnsv1alpha1.Notifier,
-	log logr.Logger,
 ) (*corev1.ConfigMap, error) {
 	var (
 		configMap *corev1.ConfigMap
@@ -278,7 +268,7 @@ func (r *NotifierReconciler) FetchConfig(
 		Status:  status,
 	}
 
-	_ = r.UpdateConditions(ctx, notifier, condition, log)
+	r.UpdateConditions(ctx, notifier, condition)
 
 	return configMap, err
 }
@@ -287,7 +277,6 @@ func (r *NotifierReconciler) FetchSecret(
 	ctx context.Context,
 	req ctrl.Request,
 	notifier *ddnsv1alpha1.Notifier,
-	log logr.Logger,
 ) (*corev1.Secret, error) {
 	var (
 		err     error
@@ -312,7 +301,7 @@ func (r *NotifierReconciler) FetchSecret(
 		Status:  status,
 	}
 
-	_ = r.UpdateConditions(ctx, notifier, condition, log)
+	r.UpdateConditions(ctx, notifier, condition)
 
 	return secret, nil
 }
@@ -321,25 +310,22 @@ func (r *NotifierReconciler) UpdateConditions(
 	ctx context.Context,
 	notifier *ddnsv1alpha1.Notifier,
 	condition metav1.Condition,
-	log logr.Logger,
-) error {
-	return r.PatchStatus(ctx, notifier, func() bool {
+) {
+	r.PatchStatus(ctx, notifier, func(notifier *ddnsv1alpha1.Notifier) bool {
 		condition.ObservedGeneration = notifier.GetGeneration()
 
 		return meta.SetStatusCondition(&notifier.Status.Conditions, condition)
-	}, log)
+	})
 }
 
 func (r *NotifierReconciler) PatchStatus(
 	ctx context.Context,
 	notifier *ddnsv1alpha1.Notifier,
-	apply func() bool,
-	log logr.Logger,
+	apply func(notifier *ddnsv1alpha1.Notifier) bool,
 ) error {
 	patch := client.MergeFrom(notifier.DeepCopy())
-	if apply() {
+	if apply(notifier) {
 		if err := r.Status().Patch(ctx, notifier, patch); err != nil {
-			log.Error(err, "unable to patch status")
 			return err
 		}
 	}
@@ -378,8 +364,8 @@ func (r *NotifierReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r NotifierReconciler) updateObservedGeneration(notifiers *ddnsv1alpha1.Notifier, observedGeneration int64) func() bool {
-	return func() bool {
+func (r NotifierReconciler) updateObservedGeneration(observedGeneration int64) func(notifiers *ddnsv1alpha1.Notifier) bool {
+	return func(notifiers *ddnsv1alpha1.Notifier) bool {
 		if notifiers.Status.ObservedGeneration == observedGeneration {
 			return false
 		}
@@ -390,8 +376,8 @@ func (r NotifierReconciler) updateObservedGeneration(notifiers *ddnsv1alpha1.Not
 	}
 }
 
-func (r NotifierReconciler) updateIsReady(notifiers *ddnsv1alpha1.Notifier, isReady bool) func() bool {
-	return func() bool {
+func (r NotifierReconciler) updateIsReady(isReady bool) func(notifiers *ddnsv1alpha1.Notifier) bool {
+	return func(notifiers *ddnsv1alpha1.Notifier) bool {
 		if notifiers.Status.IsReady == isReady {
 			return false
 		}
