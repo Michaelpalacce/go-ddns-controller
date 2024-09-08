@@ -80,11 +80,11 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	if err := r.PatchStatus(ctx, provider, r.updatePublicIp(provider, publicIp), log); err != nil {
+	if err := r.PatchStatus(ctx, provider, r.patchPublicIp(publicIp)); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if providerClient, err = r.FetchClient(ctx, req, provider, log); err != nil {
+	if providerClient, err = r.FetchClient(ctx, req, provider); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -92,7 +92,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	if err := r.PatchStatus(ctx, provider, r.updateProviderIp(provider, providerIp), log); err != nil {
+	if err := r.PatchStatus(ctx, provider, r.patchProviderIp(providerIp)); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -103,19 +103,12 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			return ctrl.Result{}, err
 		}
 
-		if err := r.PatchStatus(ctx, provider, r.updateProviderIp(provider, provider.Status.PublicIP), log); err != nil {
+		if err := r.PatchStatus(ctx, provider, r.patchProviderIp(provider.Status.PublicIP)); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
 
-	if err := r.PatchStatus(ctx, provider, func() bool {
-		if provider.Status.ObservedGeneration == provider.GetGeneration() {
-			return false
-		}
-		provider.Status.ObservedGeneration = provider.GetGeneration()
-		return true
-	}, log); err != nil {
-		log.Error(err, "unable to update Provider status")
+	if err := r.PatchStatus(ctx, provider, r.patchObservedGeneration()); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -147,7 +140,6 @@ func (r *ProviderReconciler) FetchSecret(
 	ctx context.Context,
 	req ctrl.Request,
 	provider *ddnsv1alpha1.Provider,
-	log logr.Logger,
 ) (*corev1.Secret, error) {
 	var (
 		err     error
@@ -172,7 +164,7 @@ func (r *ProviderReconciler) FetchSecret(
 		Status:  status,
 	}
 
-	_ = r.UpdateConditions(ctx, provider, condition, log)
+	r.UpdateConditions(ctx, provider, condition)
 
 	return secret, err
 }
@@ -181,7 +173,6 @@ func (r *ProviderReconciler) FetchConfig(
 	ctx context.Context,
 	req ctrl.Request,
 	provider *ddnsv1alpha1.Provider,
-	log logr.Logger,
 ) (*corev1.ConfigMap, error) {
 	var (
 		configMap *corev1.ConfigMap
@@ -206,7 +197,7 @@ func (r *ProviderReconciler) FetchConfig(
 		Status:  status,
 	}
 
-	_ = r.UpdateConditions(ctx, provider, condition, log)
+	r.UpdateConditions(ctx, provider, condition)
 
 	return configMap, err
 }
@@ -215,7 +206,6 @@ func (r *ProviderReconciler) FetchClient(
 	ctx context.Context,
 	req ctrl.Request,
 	provider *ddnsv1alpha1.Provider,
-	log logr.Logger,
 ) (clients.Client, error) {
 	var (
 		err     error
@@ -223,17 +213,17 @@ func (r *ProviderReconciler) FetchClient(
 		status  metav1.ConditionStatus
 	)
 
-	secret, err := r.FetchSecret(ctx, req, provider, log)
+	secret, err := r.FetchSecret(ctx, req, provider)
 	if err != nil {
 		return nil, err
 	}
 
-	configMap, err := r.FetchConfig(ctx, req, provider, log)
+	configMap, err := r.FetchConfig(ctx, req, provider)
 	if err != nil {
 		return nil, err
 	}
 
-	providerClient, err := r.ClientFactory(provider.Spec.Name, secret, configMap, log)
+	providerClient, err := r.ClientFactory(provider.Spec.Name, secret, configMap, log.FromContext(ctx))
 	if err != nil {
 		message = fmt.Sprintf("could not create client: %s", err)
 		status = metav1.ConditionFalse
@@ -249,7 +239,7 @@ func (r *ProviderReconciler) FetchClient(
 		Status:  status,
 	}
 
-	_ = r.UpdateConditions(ctx, provider, condition, log)
+	r.UpdateConditions(ctx, provider, condition)
 
 	return providerClient, err
 }
@@ -258,25 +248,22 @@ func (r *ProviderReconciler) UpdateConditions(
 	ctx context.Context,
 	provider *ddnsv1alpha1.Provider,
 	condition metav1.Condition,
-	log logr.Logger,
-) error {
-	return r.PatchStatus(ctx, provider, func() bool {
+) {
+	r.PatchStatus(ctx, provider, func(provider *ddnsv1alpha1.Provider) bool {
 		condition.ObservedGeneration = provider.GetGeneration()
 
 		return meta.SetStatusCondition(&provider.Status.Conditions, condition)
-	}, log)
+	})
 }
 
 func (r *ProviderReconciler) PatchStatus(
 	ctx context.Context,
 	provider *ddnsv1alpha1.Provider,
-	apply func() bool,
-	log logr.Logger,
+	apply func(*ddnsv1alpha1.Provider) bool,
 ) error {
 	patch := client.MergeFrom(provider.DeepCopy())
-	if apply() {
+	if apply(provider) {
 		if err := r.Status().Patch(ctx, provider, patch); err != nil {
-			log.Error(err, "unable to patch status")
 			return err
 		}
 	}
@@ -284,8 +271,8 @@ func (r *ProviderReconciler) PatchStatus(
 	return nil
 }
 
-func (p ProviderReconciler) updateProviderIp(provider *ddnsv1alpha1.Provider, providerIp string) func() bool {
-	return func() bool {
+func (p ProviderReconciler) patchProviderIp(providerIp string) func(provider *ddnsv1alpha1.Provider) bool {
+	return func(provider *ddnsv1alpha1.Provider) bool {
 		if provider.Status.ProviderIP == providerIp {
 			return false
 		}
@@ -296,14 +283,24 @@ func (p ProviderReconciler) updateProviderIp(provider *ddnsv1alpha1.Provider, pr
 	}
 }
 
-func (p ProviderReconciler) updatePublicIp(provider *ddnsv1alpha1.Provider, publicIp string) func() bool {
-	return func() bool {
+func (p ProviderReconciler) patchPublicIp(publicIp string) func(provider *ddnsv1alpha1.Provider) bool {
+	return func(provider *ddnsv1alpha1.Provider) bool {
 		if provider.Status.PublicIP == publicIp {
 			return false
 		}
 
 		provider.Status.PublicIP = publicIp
 
+		return true
+	}
+}
+
+func (p ProviderReconciler) patchObservedGeneration() func(provider *ddnsv1alpha1.Provider) bool {
+	return func(provider *ddnsv1alpha1.Provider) bool {
+		if provider.Status.ObservedGeneration == provider.GetGeneration() {
+			return false
+		}
+		provider.Status.ObservedGeneration = provider.GetGeneration()
 		return true
 	}
 }
