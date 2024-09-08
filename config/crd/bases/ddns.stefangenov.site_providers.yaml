@@ -44,8 +44,9 @@ spec:
                   provider specific configuration.
                 type: string
               customIPProvider:
-                description: CustomIPProvider is the name of the custom IP provider
-                  that should be used to get the IP.
+                description: |-
+                  CustomIPProvider is the URL of the custom IP provider that should be used to get the IP.
+                  If this is set, the provider will use this URL to get the IP FIRST, but will fallback to the rest of the IP providers.
                 type: string
               name:
                 description: Name is the name of the provider we want to create.

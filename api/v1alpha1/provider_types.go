@@ -49,7 +49,8 @@ type ProviderSpec struct {
 	// +kubebuilder:default:=900
 	RetryInterval int64 `json:"retryInterval"`
 
-	// CustomIPProvider is the name of the custom IP provider that should be used to get the IP.
+	// CustomIPProvider is the URL of the custom IP provider that should be used to get the IP.
+	// If this is set, the provider will use this URL to get the IP FIRST, but will fallback to the rest of the IP providers.
 	// +kubebuilder:validation:Optional
 	CustomIPProvider string `json:"customIPProvider"`
 

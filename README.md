@@ -34,6 +34,7 @@ spec:
   configMap: cloudflare-config
   notifierRefs:
     - name: webhook-notifier
+  customIPProvider: https://myIpProvider.example.com
 ```
 
 Each provider has both a secret and a config map. The secret contains the credentials needed to authenticate with the provider's API.

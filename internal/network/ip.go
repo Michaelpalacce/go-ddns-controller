@@ -31,18 +31,16 @@ func shuffle(slice []string) {
 // GetPublicIp will fetch the public IP of the
 // machine that is running goip
 func GetPublicIp(customIpProvider string) (string, error) {
-	currentIpProviders := append(ipProviders, customIpProvider)
-
+	currentIpProviders := ipProviders
 	shuffle(currentIpProviders)
 
-	fmt.Println("ipProviders: ", currentIpProviders)
+	currentIpProviders = append([]string{customIpProvider}, ipProviders...)
 
 	for _, provider := range currentIpProviders {
 		if provider == "" {
 			continue
 		}
 
-		fmt.Println("provider: ", provider)
 		ip, err := GetBody(provider)
 		if err != nil {
 			slog.Error("Error while trying to fetch ip from provider", "error", err, "provider", provider)
