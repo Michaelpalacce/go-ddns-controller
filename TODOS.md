@@ -4,13 +4,17 @@
 ## Tests
 
 - [x] Write unit tests for the notifier
-- [ ] Unit test the Provider Clients
+- [x] Unit test the Provider Clients
 
 ## Documentation
 
 - [ ] Write better documentation in a `docs` folder perhaps?
 
 # Next Steps Checklist
+
+## Tests
+
+- [ ] Unit test the Notifier Clients
 
 ## Public IP Fetcher
 
