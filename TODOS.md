@@ -1,15 +1,3 @@
-# v1.0.0 Checklist
-
-
-## Tests
-
-- [x] Write unit tests for the notifier
-- [x] Unit test the Provider Clients
-
-## Documentation
-
-- [ ] Write better documentation in a `docs` folder perhaps?
-
 # Next Steps Checklist
 
 ## Tests
@@ -25,6 +13,10 @@
 - [ ] Add Telegram as an available notifier
 
 # General Checklist
+
+## Documentation
+
+- [ ] Write better documentation in a `docs` folder perhaps?
 
 ## Notifiers
 
