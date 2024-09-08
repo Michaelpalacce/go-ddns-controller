@@ -60,13 +60,13 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	notifierClient, err := r.FetchNotifier(ctx, req, notifier)
+	notifierClient, err := r.fetchNotifier(ctx, req, notifier)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to fetch notifier: %w", err)
 	}
 
 	if !notifier.Status.IsReady {
-		if err := r.MarkAsReady(ctx, notifier, notifierClient); err != nil {
+		if err := r.markAsReady(ctx, notifier, notifierClient); err != nil {
 			return ctrl.Result{}, fmt.Errorf("unable to mark Notifier as ready: %w", err)
 		}
 
@@ -89,21 +89,23 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	for _, provider := range filteredProviders {
-		if err = r.NotifyOfChange(ctx, req, &provider, notifier, notifierClient); err != nil {
+		if err = r.notifyOfChange(ctx, req, &provider, notifier, notifierClient); err != nil {
 			return ctrl.Result{}, fmt.Errorf("unable to notify of change: %w", err)
 		}
 	}
 
-	if err := r.PatchStatus(ctx, notifier, r.updateObservedGeneration(notifier.GetGeneration())); err != nil {
+	if err := r.patchStatus(ctx, notifier, r.patchObservedGeneration(notifier.GetGeneration())); err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to update Notifier status: %w", err)
 	}
 
 	return ctrl.Result{}, nil
 }
 
-// MarkAsReady marks the Notifier as ready
+// ============================================== PRIVATE FUNCTIONS ==============================================
+
+// markAsReady marks the Notifier as ready
 // Ready means that the Notifier has been successfully created and a greeting message has been sent
-func (r *NotifierReconciler) MarkAsReady(
+func (r *NotifierReconciler) markAsReady(
 	ctx context.Context,
 	notifier *ddnsv1alpha1.Notifier,
 	notifierClient notifiers.Notifier,
@@ -117,26 +119,26 @@ func (r *NotifierReconciler) MarkAsReady(
 		condition.Message = fmt.Sprintf("unable to send greetings: %s", err)
 		condition.Status = metav1.ConditionFalse
 
-		r.UpdateConditions(ctx, notifier, condition)
+		r.updateConditions(ctx, notifier, condition)
 		return fmt.Errorf("unable to send greetings: %w", err)
 	}
 
 	condition.Message = "Communications established"
 	condition.Status = metav1.ConditionTrue
 
-	r.UpdateConditions(ctx, notifier, condition)
+	r.updateConditions(ctx, notifier, condition)
 
-	if err := r.PatchStatus(ctx, notifier, r.updateIsReady(true)); err != nil {
+	if err := r.patchStatus(ctx, notifier, r.patchIsReady(true)); err != nil {
 		return fmt.Errorf("unable to mark Notifier as ready: %w", err)
 	}
 
 	return nil
 }
 
-// NotifyOfChange sends a notification to the notifierClient
+// notifyOfChange sends a notification to the notifierClient
 // We need to first update the annotation of the Provider with the new IP, then send the notification
 // this is done to avoid issues with the resouceVersion of the Provider object
-func (r *NotifierReconciler) NotifyOfChange(
+func (r *NotifierReconciler) notifyOfChange(
 	ctx context.Context,
 	req ctrl.Request,
 	provider *ddnsv1alpha1.Provider,
@@ -174,7 +176,7 @@ func (r *NotifierReconciler) NotifyOfChange(
 	if err := notifierClient.SendNotification(message); err != nil {
 		log.Error(err, "unable to send notification")
 
-		if err := r.PatchStatus(ctx, notifier, r.updateIsReady(false)); err != nil {
+		if err := r.patchStatus(ctx, notifier, r.patchIsReady(false)); err != nil {
 			log.Error(err, "unable to mark Notifier as not ready")
 		}
 
@@ -185,7 +187,7 @@ func (r *NotifierReconciler) NotifyOfChange(
 			Status:  metav1.ConditionFalse,
 		}
 
-		r.UpdateConditions(ctx, notifier, condition)
+		r.updateConditions(ctx, notifier, condition)
 
 		return err
 	}
@@ -198,7 +200,7 @@ func (r *NotifierReconciler) NotifyOfChange(
 	return nil
 }
 
-func (r *NotifierReconciler) FetchNotifier(
+func (r *NotifierReconciler) fetchNotifier(
 	ctx context.Context,
 	req ctrl.Request,
 	notifier *ddnsv1alpha1.Notifier,
@@ -209,12 +211,12 @@ func (r *NotifierReconciler) FetchNotifier(
 		status  metav1.ConditionStatus
 	)
 
-	configMap, err := r.FetchConfig(ctx, req, notifier)
+	configMap, err := r.fetchConfig(ctx, req, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch ConfigMap: %w", err)
 	}
 
-	secret, err := r.FetchSecret(ctx, req, notifier)
+	secret, err := r.fetchSecret(ctx, req, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch Secret: %w", err)
 	}
@@ -235,12 +237,12 @@ func (r *NotifierReconciler) FetchNotifier(
 		Status:  status,
 	}
 
-	r.UpdateConditions(ctx, notifier, condition)
+	r.updateConditions(ctx, notifier, condition)
 
 	return notifierClient, err
 }
 
-func (r *NotifierReconciler) FetchConfig(
+func (r *NotifierReconciler) fetchConfig(
 	ctx context.Context,
 	req ctrl.Request,
 	notifier *ddnsv1alpha1.Notifier,
@@ -268,12 +270,12 @@ func (r *NotifierReconciler) FetchConfig(
 		Status:  status,
 	}
 
-	r.UpdateConditions(ctx, notifier, condition)
+	r.updateConditions(ctx, notifier, condition)
 
 	return configMap, err
 }
 
-func (r *NotifierReconciler) FetchSecret(
+func (r *NotifierReconciler) fetchSecret(
 	ctx context.Context,
 	req ctrl.Request,
 	notifier *ddnsv1alpha1.Notifier,
@@ -301,24 +303,24 @@ func (r *NotifierReconciler) FetchSecret(
 		Status:  status,
 	}
 
-	r.UpdateConditions(ctx, notifier, condition)
+	r.updateConditions(ctx, notifier, condition)
 
 	return secret, nil
 }
 
-func (r *NotifierReconciler) UpdateConditions(
+func (r *NotifierReconciler) updateConditions(
 	ctx context.Context,
 	notifier *ddnsv1alpha1.Notifier,
 	condition metav1.Condition,
 ) {
-	r.PatchStatus(ctx, notifier, func(notifier *ddnsv1alpha1.Notifier) bool {
+	r.patchStatus(ctx, notifier, func(notifier *ddnsv1alpha1.Notifier) bool {
 		condition.ObservedGeneration = notifier.GetGeneration()
 
 		return meta.SetStatusCondition(&notifier.Status.Conditions, condition)
 	})
 }
 
-func (r *NotifierReconciler) PatchStatus(
+func (r *NotifierReconciler) patchStatus(
 	ctx context.Context,
 	notifier *ddnsv1alpha1.Notifier,
 	apply func(notifier *ddnsv1alpha1.Notifier) bool,
@@ -331,6 +333,20 @@ func (r *NotifierReconciler) PatchStatus(
 	}
 
 	return nil
+}
+
+// ============================================ SETUP FUNCTIONS ============================================
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *NotifierReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&ddnsv1alpha1.Notifier{}).
+		Watches(
+			&ddnsv1alpha1.Provider{},
+			handler.EnqueueRequestsFromMapFunc(r.findObjectsForProvider),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
+		Complete(r)
 }
 
 // findObjectsForProvider returns a list of requests for Notifiers that are referenced by Providers
@@ -352,19 +368,9 @@ func (r *NotifierReconciler) findObjectsForProvider(ctx context.Context, provide
 	return requests
 }
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *NotifierReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&ddnsv1alpha1.Notifier{}).
-		Watches(
-			&ddnsv1alpha1.Provider{},
-			handler.EnqueueRequestsFromMapFunc(r.findObjectsForProvider),
-			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
-		).
-		Complete(r)
-}
+// ============================================ PATCH FUNCTIONS ============================================
 
-func (r NotifierReconciler) updateObservedGeneration(observedGeneration int64) func(notifiers *ddnsv1alpha1.Notifier) bool {
+func (r NotifierReconciler) patchObservedGeneration(observedGeneration int64) func(notifiers *ddnsv1alpha1.Notifier) bool {
 	return func(notifiers *ddnsv1alpha1.Notifier) bool {
 		if notifiers.Status.ObservedGeneration == observedGeneration {
 			return false
@@ -376,7 +382,7 @@ func (r NotifierReconciler) updateObservedGeneration(observedGeneration int64) f
 	}
 }
 
-func (r NotifierReconciler) updateIsReady(isReady bool) func(notifiers *ddnsv1alpha1.Notifier) bool {
+func (r NotifierReconciler) patchIsReady(isReady bool) func(notifiers *ddnsv1alpha1.Notifier) bool {
 	return func(notifiers *ddnsv1alpha1.Notifier) bool {
 		if notifiers.Status.IsReady == isReady {
 			return false
