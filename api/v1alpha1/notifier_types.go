@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/conditions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -86,4 +87,21 @@ type NotifierList struct {
 
 func init() {
 	SchemeBuilder.Register(&Notifier{}, &NotifierList{})
+}
+
+// =================================================== Status ===================================================
+
+const (
+	NotifierConditionTypeClient = "Client"
+
+	NotifierConditionTypeConfigMap = "ConfigMap"
+
+	NotifierConditionTypeSecret = "Secret"
+)
+
+func (n *Notifier) Conditions() *conditions.Conditions {
+	return &conditions.Conditions{
+		Conditions:     &n.Status.Conditions,
+		ConditionTypes: []string{NotifierConditionTypeConfigMap, NotifierConditionTypeSecret, NotifierConditionTypeClient},
+	}
 }

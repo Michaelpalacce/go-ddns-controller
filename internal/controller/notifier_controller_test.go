@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
-	notifierConditions "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/notifier/conditions"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/clients"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/notifiers"
 )
@@ -273,14 +272,14 @@ var _ = Describe("Notifier Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(resource.Status.Conditions).To(HaveLen(3))
-			Expect(resource.Status.Conditions[0].Reason).To(Equal(notifierConditions.ConfigMapFound))
-			Expect(resource.Status.Conditions[0].Type).To(Equal(notifierConditions.ConfigMapConditionType))
+			Expect(resource.Status.Conditions[0].Reason).To(Equal("ConfigMapFound"))
+			Expect(resource.Status.Conditions[0].Type).To(Equal("ConfigMap"))
 			Expect(resource.Status.Conditions[0].Message).To(Equal(fmt.Sprintf("ConfigMap %s found", configMapNotifierNamespacedName.Name)))
-			Expect(resource.Status.Conditions[1].Reason).To(Equal(notifierConditions.SecretFound))
-			Expect(resource.Status.Conditions[1].Type).To(Equal(notifierConditions.SecretConditionType))
+			Expect(resource.Status.Conditions[1].Reason).To(Equal("SecretFound"))
+			Expect(resource.Status.Conditions[1].Type).To(Equal("Secret"))
 			Expect(resource.Status.Conditions[1].Message).To(Equal(fmt.Sprintf("Secret %s found", secretNotifierNamespacedName.Name)))
-			Expect(resource.Status.Conditions[2].Reason).To(Equal(notifierConditions.ClientCommunication))
-			Expect(resource.Status.Conditions[2].Type).To(Equal(notifierConditions.ClientConditionType))
+			Expect(resource.Status.Conditions[2].Reason).To(Equal("ClientCommunication"))
+			Expect(resource.Status.Conditions[2].Type).To(Equal("Client"))
 			Expect(resource.Status.Conditions[2].Message).To(Equal("Communications established"))
 			Expect(resource.Status.IsReady).To(BeTrue())
 			Expect(int(resource.Status.ObservedGeneration)).To(Equal(0))
@@ -310,14 +309,14 @@ var _ = Describe("Notifier Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(resource.Status.Conditions).To(HaveLen(3))
-			Expect(resource.Status.Conditions[0].Reason).To(Equal(notifierConditions.ConfigMapFound))
-			Expect(resource.Status.Conditions[0].Type).To(Equal(notifierConditions.ConfigMapConditionType))
+			Expect(resource.Status.Conditions[0].Reason).To(Equal("ConfigMapFound"))
+			Expect(resource.Status.Conditions[0].Type).To(Equal("ConfigMap"))
 			Expect(resource.Status.Conditions[0].Message).To(Equal(fmt.Sprintf("ConfigMap %s found", configMapNotifierNamespacedName.Name)))
-			Expect(resource.Status.Conditions[1].Reason).To(Equal(notifierConditions.SecretFound))
-			Expect(resource.Status.Conditions[1].Type).To(Equal(notifierConditions.SecretConditionType))
+			Expect(resource.Status.Conditions[1].Reason).To(Equal("SecretFound"))
+			Expect(resource.Status.Conditions[1].Type).To(Equal("Secret"))
 			Expect(resource.Status.Conditions[1].Message).To(Equal(fmt.Sprintf("Secret %s found", secretNotifierNamespacedName.Name)))
-			Expect(resource.Status.Conditions[2].Reason).To(Equal(notifierConditions.ClientCommunication))
-			Expect(resource.Status.Conditions[2].Type).To(Equal(notifierConditions.ClientConditionType))
+			Expect(resource.Status.Conditions[2].Reason).To(Equal("ClientCommunication"))
+			Expect(resource.Status.Conditions[2].Type).To(Equal("Client"))
 			Expect(resource.Status.Conditions[2].Status).To(Equal(metav1.ConditionFalse))
 			Expect(resource.Status.Conditions[2].Message).To(Equal("unable to send greetings: error sending greetings"))
 			Expect(resource.Status.IsReady).NotTo(BeTrue())

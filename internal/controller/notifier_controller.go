@@ -21,8 +21,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ddnsv1alpha1 "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1"
-	notifierConditions "github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/notifier/conditions"
+	"github.com/Michaelpalacce/go-ddns-controller/api/v1alpha1/conditions"
 	"github.com/Michaelpalacce/go-ddns-controller/internal/notifiers"
 )
 
@@ -59,6 +57,8 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if err := r.Get(ctx, req.NamespacedName, notifier); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	notifier.Conditions().FillConditions()
 
 	notifierClient, err := r.fetchNotifier(ctx, req, notifier)
 	if err != nil {
@@ -110,23 +110,26 @@ func (r *NotifierReconciler) markAsReady(
 	notifier *ddnsv1alpha1.Notifier,
 	notifierClient notifiers.Notifier,
 ) (err error) {
-	condition := metav1.Condition{
-		Type:   notifierConditions.ClientConditionType,
-		Reason: notifierConditions.ClientCommunication,
-	}
+	condOptions := []conditions.ConditionOption{}
 
 	if err = notifierClient.SendGreetings(notifier); err != nil {
-		condition.Message = fmt.Sprintf("unable to send greetings: %s", err)
-		condition.Status = metav1.ConditionFalse
-
-		r.updateConditions(ctx, notifier, condition)
-		return fmt.Errorf("unable to send greetings: %w", err)
+		message := fmt.Sprintf("unable to send greetings: %s", err)
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("ClientCommunication", message),
+			conditions.False(),
+		)
+	} else {
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("ClientCommunication", "Communications established"),
+			conditions.True(),
+		)
 	}
 
-	condition.Message = "Communications established"
-	condition.Status = metav1.ConditionTrue
+	conditions.PatchConditions(ctx, r.Client, notifier, ddnsv1alpha1.NotifierConditionTypeClient, condOptions...)
 
-	r.updateConditions(ctx, notifier, condition)
+	if err != nil {
+		return fmt.Errorf("unable to send greetings: %w", err)
+	}
 
 	if err := r.patchStatus(ctx, notifier, r.patchIsReady(true)); err != nil {
 		return fmt.Errorf("unable to mark Notifier as ready: %w", err)
@@ -180,20 +183,24 @@ func (r *NotifierReconciler) notifyOfChange(
 			log.Error(err, "unable to mark Notifier as not ready")
 		}
 
-		condition := metav1.Condition{
-			Type:    notifierConditions.ClientConditionType,
-			Reason:  notifierConditions.ClientCommunication,
-			Message: fmt.Sprintf("unable to send notification: %s", err),
-			Status:  metav1.ConditionFalse,
+		condOptions := []conditions.ConditionOption{
+			conditions.WithReasonAndMessage("ClientCommunication", fmt.Sprintf("unable to send notification: %s", err)),
+			conditions.False(),
 		}
 
-		r.updateConditions(ctx, notifier, condition)
+		conditions.PatchConditions(ctx, r.Client, notifier, ddnsv1alpha1.NotifierConditionTypeClient, condOptions...)
 
 		return err
 	}
 
+	condOptions := []conditions.ConditionOption{
+		conditions.WithReasonAndMessage("ClientCommunication", "Notification sent"),
+		conditions.True(),
+	}
+
+	conditions.PatchConditions(ctx, r.Client, notifier, ddnsv1alpha1.NotifierConditionTypeClient, condOptions...)
+
 	if err := r.Patch(ctx, provider, patch); err != nil {
-		log.Error(err, "unable to update Provider annotation")
 		return err
 	}
 
@@ -205,11 +212,7 @@ func (r *NotifierReconciler) fetchNotifier(
 	req ctrl.Request,
 	notifier *ddnsv1alpha1.Notifier,
 ) (notifiers.Notifier, error) {
-	var (
-		err     error
-		message string
-		status  metav1.ConditionStatus
-	)
+	var err error
 
 	configMap, err := r.fetchConfig(ctx, req, notifier)
 	if err != nil {
@@ -221,23 +224,22 @@ func (r *NotifierReconciler) fetchNotifier(
 		return nil, fmt.Errorf("unable to fetch Secret: %w", err)
 	}
 
+	condOptions := []conditions.ConditionOption{}
+
 	notifierClient, err := r.NotifierFactory(notifier, secret, configMap)
 	if err != nil {
-		message = fmt.Sprintf("could not create client: %s", err)
-		status = metav1.ConditionFalse
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("ClientCreated", fmt.Sprintf("could not create client: %s", err)),
+			conditions.False(),
+		)
 	} else {
-		message = "Client created"
-		status = metav1.ConditionTrue
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("ClientCreated", "Client created"),
+			conditions.True(),
+		)
 	}
 
-	condition := metav1.Condition{
-		Type:    notifierConditions.ClientConditionType,
-		Reason:  notifierConditions.ClientCreated,
-		Message: message,
-		Status:  status,
-	}
-
-	r.updateConditions(ctx, notifier, condition)
+	conditions.PatchConditions(ctx, r.Client, notifier, ddnsv1alpha1.NotifierConditionTypeClient, condOptions...)
 
 	return notifierClient, err
 }
@@ -250,27 +252,24 @@ func (r *NotifierReconciler) fetchConfig(
 	var (
 		configMap *corev1.ConfigMap
 		err       error
-		message   string
-		status    metav1.ConditionStatus
 	)
+
+	condOptions := []conditions.ConditionOption{}
+
 	configMap = &corev1.ConfigMap{}
-
 	if err = r.Get(ctx, types.NamespacedName{Name: notifier.Spec.ConfigMap, Namespace: req.Namespace}, configMap); err != nil {
-		message = fmt.Sprintf("ConfigMap %s not found", notifier.Spec.ConfigMap)
-		status = metav1.ConditionFalse
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("ConfigMapFound", err.Error()),
+			conditions.False(),
+		)
 	} else {
-		message = fmt.Sprintf("ConfigMap %s found", notifier.Spec.ConfigMap)
-		status = metav1.ConditionTrue
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("ConfigMapFound", fmt.Sprintf("ConfigMap %s found", notifier.Spec.ConfigMap)),
+			conditions.True(),
+		)
 	}
 
-	condition := metav1.Condition{
-		Type:    notifierConditions.ConfigMapConditionType,
-		Reason:  notifierConditions.ConfigMapFound,
-		Message: message,
-		Status:  status,
-	}
-
-	r.updateConditions(ctx, notifier, condition)
+	conditions.PatchConditions(ctx, r.Client, notifier, ddnsv1alpha1.NotifierConditionTypeConfigMap, condOptions...)
 
 	return configMap, err
 }
@@ -281,43 +280,28 @@ func (r *NotifierReconciler) fetchSecret(
 	notifier *ddnsv1alpha1.Notifier,
 ) (*corev1.Secret, error) {
 	var (
-		err     error
-		message string
-		status  metav1.ConditionStatus
-		secret  *corev1.Secret
+		err    error
+		secret *corev1.Secret
 	)
+
+	condOptions := []conditions.ConditionOption{}
 
 	secret = &corev1.Secret{}
 	if err = r.Get(ctx, types.NamespacedName{Name: notifier.Spec.SecretName, Namespace: req.Namespace}, secret); err != nil {
-		message = fmt.Sprintf("Secret %s not found", notifier.Spec.SecretName)
-		status = metav1.ConditionFalse
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("SecretFound", err.Error()),
+			conditions.False(),
+		)
 	} else {
-		message = fmt.Sprintf("Secret %s found", notifier.Spec.SecretName)
-		status = metav1.ConditionTrue
+		condOptions = append(condOptions,
+			conditions.WithReasonAndMessage("SecretFound", fmt.Sprintf("Secret %s found", notifier.Spec.SecretName)),
+			conditions.True(),
+		)
 	}
 
-	condition := metav1.Condition{
-		Type:    notifierConditions.SecretConditionType,
-		Reason:  notifierConditions.SecretFound,
-		Message: message,
-		Status:  status,
-	}
-
-	r.updateConditions(ctx, notifier, condition)
+	conditions.PatchConditions(ctx, r.Client, notifier, ddnsv1alpha1.NotifierConditionTypeSecret, condOptions...)
 
 	return secret, nil
-}
-
-func (r *NotifierReconciler) updateConditions(
-	ctx context.Context,
-	notifier *ddnsv1alpha1.Notifier,
-	condition metav1.Condition,
-) {
-	r.patchStatus(ctx, notifier, func(notifier *ddnsv1alpha1.Notifier) bool {
-		condition.ObservedGeneration = notifier.GetGeneration()
-
-		return meta.SetStatusCondition(&notifier.Status.Conditions, condition)
-	})
 }
 
 func (r *NotifierReconciler) patchStatus(

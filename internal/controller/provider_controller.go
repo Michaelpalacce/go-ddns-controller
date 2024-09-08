@@ -145,7 +145,7 @@ func (r *ProviderReconciler) fetchSecret(
 		)
 	}
 
-	r.setConditions(ctx, provider, ddnsv1alpha1.ProviderConditionTypeSecret, condOptions...)
+	conditions.PatchConditions(ctx, r.Client, provider, ddnsv1alpha1.ProviderConditionTypeSecret, condOptions...)
 
 	return secret, err
 }
@@ -175,7 +175,7 @@ func (r *ProviderReconciler) fetchConfig(
 		)
 	}
 
-	r.setConditions(ctx, provider, ddnsv1alpha1.ProviderConditionTypeConfigMap, condOptions...)
+	conditions.PatchConditions(ctx, r.Client, provider, ddnsv1alpha1.ProviderConditionTypeConfigMap, condOptions...)
 
 	return configMap, err
 }
@@ -210,22 +210,9 @@ func (r *ProviderReconciler) fetchClient(
 		)
 	}
 
-	r.setConditions(ctx, provider, ddnsv1alpha1.ProviderConditionTypeClient, condOptions...)
+	conditions.PatchConditions(ctx, r.Client, provider, ddnsv1alpha1.ProviderConditionTypeClient, condOptions...)
 
 	return providerClient, err
-}
-
-func (r *ProviderReconciler) setConditions(
-	ctx context.Context,
-	provider *ddnsv1alpha1.Provider,
-	conditionType string,
-	options ...conditions.ConditionOption,
-) {
-	patch := client.MergeFrom(provider.DeepCopy())
-	options = append(options, conditions.WithObservedGeneration(provider.GetGeneration()))
-	if provider.Conditions().SetCondition(conditionType, options...) {
-		_ = r.Status().Patch(ctx, provider, patch)
-	}
 }
 
 func (r *ProviderReconciler) patchStatus(
