@@ -1,15 +1,21 @@
 package conditions
 
 import (
+	"time"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Conditions is a struct that holds a list of conditions and a list of condition types that should be present.
+// As it uses pointers, you can freely modify the conditions and it will be reflected in the original object.
 type Conditions struct {
 	Conditions     *[]metav1.Condition `json:"conditions,omitempty"`
 	ConditionTypes []string            `json:"conditionTypes"`
 }
 
+// FillConditions is used to fill the conditions with the condition types that are specified in ConditionTypes.
+// This is so that the conditions are always up to date with the condition types.
 func (c *Conditions) FillConditions() bool {
 	changed := false
 	for _, conditionType := range c.ConditionTypes {
@@ -26,6 +32,8 @@ func (c *Conditions) FillConditions() bool {
 	return changed
 }
 
+// GetCondition returns the condition with the specified type.
+// If the condition does not exist, it returns nil.
 func (c *Conditions) GetCondition(conditionType string) *metav1.Condition {
 	if c.Conditions == nil {
 		return nil
@@ -40,6 +48,8 @@ func (c *Conditions) GetCondition(conditionType string) *metav1.Condition {
 	return nil
 }
 
+// SetCondition sets the condition with the specified type to the specified options.
+// If the condition does not exist, it will be created with unknown status.
 func (c *Conditions) SetCondition(conditionType string, options ...ConditionOption) bool {
 	changed := false
 
@@ -48,6 +58,7 @@ func (c *Conditions) SetCondition(conditionType string, options ...ConditionOpti
 		hasChanged := c.addUnknownCondition(conditionType)
 		if hasChanged {
 			changed = true
+			condition = c.GetCondition(conditionType)
 		}
 	}
 
@@ -58,13 +69,33 @@ func (c *Conditions) SetCondition(conditionType string, options ...ConditionOpti
 		}
 	}
 
+	if changed {
+		condition.LastTransitionTime = metav1.NewTime(time.Now())
+	}
+
 	return changed
+}
+
+// ================================================ Private Functions ================================================
+
+func (c *Conditions) addUnknownCondition(conditionType string) bool {
+	return meta.SetStatusCondition(c.Conditions, metav1.Condition{
+		Type:    conditionType,
+		Status:  metav1.ConditionUnknown,
+		Reason:  "Unknown",
+		Message: "Unknown",
+	})
 }
 
 // ================================================== Condition Option ==================================================
 
+// ConditionOption is a function that modifies a condition.
+// Different options can be combined to modify a condition in multiple ways.
+// Check out the Functional Options Pattern for more information.
 type ConditionOption func(*metav1.Condition) bool
 
+// WithReasonAndMessage is a shorthand for WithReason and WithMessage
+// as those two are often used together.
 func WithReasonAndMessage(reason, message string) ConditionOption {
 	return func(condition *metav1.Condition) bool {
 		changed := false
@@ -127,15 +158,4 @@ func WithObservedGeneration(generation int64) ConditionOption {
 		condition.ObservedGeneration = generation
 		return true
 	}
-}
-
-// ================================================ Private Functions ================================================
-
-func (c *Conditions) addUnknownCondition(conditionType string) bool {
-	return meta.SetStatusCondition(c.Conditions, metav1.Condition{
-		Type:    conditionType,
-		Status:  metav1.ConditionUnknown,
-		Reason:  "Unknown",
-		Message: "Unknown",
-	})
 }

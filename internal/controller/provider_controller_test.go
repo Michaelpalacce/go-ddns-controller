@@ -214,7 +214,7 @@ var _ = Describe("Provider Controller", func() {
 			Expect(configMapCondition.Message).To(Equal(fmt.Sprintf("ConfigMap %s found", configMapNamespacedName.Name)))
 
 			clientCondition := meta.FindStatusCondition(provider.Status.Conditions, "Client")
-			Expect(clientCondition.Message).To(Equal("Client created"))
+			Expect(clientCondition.Message).To(Equal("Client created successfully"))
 		})
 
 		It("should set correct IPs if ProviderIP is empty", func() {
@@ -449,7 +449,7 @@ var _ = Describe("Provider Controller", func() {
 			Expect(meta.IsStatusConditionFalse(provider.Status.Conditions, "ConfigMap")).To(BeTrue())
 
 			condition := meta.FindStatusCondition(provider.Status.Conditions, "ConfigMap")
-			Expect(condition.Message).To(Equal("ConfigMap unexisting-configmap not found"))
+			Expect(condition.Message).To(Equal("configmaps \"unexisting-configmap\" not found"))
 		})
 
 		It("should not reconcile with unexisting secret", func() {
@@ -502,7 +502,7 @@ var _ = Describe("Provider Controller", func() {
 			Expect(meta.IsStatusConditionFalse(provider.Status.Conditions, "Secret")).To(BeTrue())
 
 			condition := meta.FindStatusCondition(provider.Status.Conditions, "Secret")
-			Expect(condition.Message).To(Equal("Secret unexisting-secret not found"))
+			Expect(condition.Message).To(Equal("secrets \"unexisting-secret\" not found"))
 		})
 
 		It("should not reconcile if cannot fetch public IP", func() {
@@ -558,7 +558,7 @@ var _ = Describe("Provider Controller", func() {
 			Expect(meta.IsStatusConditionFalse(provider.Status.Conditions, "Client")).To(BeTrue())
 
 			condition := meta.FindStatusCondition(provider.Status.Conditions, "Client")
-			Expect(condition.Message).To(Equal("could not create client: cannot create client"))
+			Expect(condition.Message).To(Equal("cannot create client"))
 		})
 
 		It("should not reconcile if the ProviderIP cannot be fetched", func() {

@@ -76,6 +76,8 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
+	provider.Conditions().FillConditions()
+
 	if err := r.patchStatus(ctx, provider, r.patchPublicIp(publicIp)); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -133,7 +135,7 @@ func (r *ProviderReconciler) fetchSecret(
 	secret = &corev1.Secret{}
 	if err = r.Get(ctx, types.NamespacedName{Name: provider.Spec.SecretName, Namespace: req.Namespace}, secret); err != nil {
 		condOptions = append(condOptions,
-			conditions.WithReasonAndMessage("SecretFound", fmt.Sprintf("could not find secret: %s", err)),
+			conditions.WithReasonAndMessage("SecretFound", err.Error()),
 			conditions.False(),
 		)
 	} else {
@@ -163,7 +165,7 @@ func (r *ProviderReconciler) fetchConfig(
 	configMap = &corev1.ConfigMap{}
 	if err = r.Get(ctx, types.NamespacedName{Name: provider.Spec.ConfigMap, Namespace: req.Namespace}, configMap); err != nil {
 		condOptions = append(condOptions,
-			conditions.WithReasonAndMessage("ConfigMapFound", fmt.Sprintf("ConfigMap %s not found", provider.Spec.ConfigMap)),
+			conditions.WithReasonAndMessage("ConfigMapFound", err.Error()),
 			conditions.False(),
 		)
 	} else {
@@ -198,7 +200,7 @@ func (r *ProviderReconciler) fetchClient(
 	providerClient, err := r.ClientFactory(provider.Spec.Name, secret, configMap, log.FromContext(ctx))
 	if err != nil {
 		condOptions = append(condOptions,
-			conditions.WithReasonAndMessage("ClientCreated", fmt.Sprintf("could not create client: %s", err)),
+			conditions.WithReasonAndMessage("ClientCreated", err.Error()),
 			conditions.False(),
 		)
 	} else {
