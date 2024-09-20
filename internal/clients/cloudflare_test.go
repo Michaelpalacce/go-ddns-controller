@@ -102,32 +102,7 @@ var _ = Describe("Cloudflare Client", func() {
 			}
 			ip, err := cloudflareClient.GetIp()
 			Expect(err).To(BeNil())
-			Expect(ip).To(Equal(dummyIp))
-		})
-
-		It("Should return the IP after fallback", func() {
-			dummyIp := "127.0.0.1"
-			cloudflareClient.API = &MockAPI{
-				ListDNSRecordsFunc: func(ctx context.Context, zoneID *cloudflare.ResourceContainer, params cloudflare.ListDNSRecordsParams) ([]cloudflare.DNSRecord, *cloudflare.ResultInfo, error) {
-					return []cloudflare.DNSRecord{
-						{
-							Name:    "test",
-							Content: dummyIp,
-						},
-						{
-							Name:    "test2",
-							Content: dummyIp + "1",
-							Type:    "A",
-						},
-					}, nil, nil
-				},
-				ZoneIDByNameFunc: func(zoneName string) (string, error) {
-					return "test", nil
-				},
-			}
-			ip, err := cloudflareClient.GetIp()
-			Expect(err).To(BeNil())
-			Expect(ip).To(Equal(dummyIp + "1"))
+			Expect(ip).To(Equal([]string{dummyIp}))
 		})
 
 		It("Should return an err if cannot find ip", func() {
@@ -143,7 +118,7 @@ var _ = Describe("Cloudflare Client", func() {
 			}
 			_, err := cloudflareClient.GetIp()
 			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(Equal("error while trying to get IP from all zones"))
+			Expect(err.Error()).To(Equal("could not find an A record for zone: example.com"))
 		})
 	})
 

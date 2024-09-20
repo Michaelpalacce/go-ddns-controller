@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -63,7 +64,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	var (
 		err            error
 		providerClient clients.Client
-		providerIp     string
+		providerIps    []string
 		publicIp       string
 	)
 
@@ -86,11 +87,14 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	if providerIp, err = providerClient.GetIp(); err != nil {
+	if providerIps, err = providerClient.GetIp(); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	if err := r.patchStatus(ctx, provider, r.patchProviderIp(providerIp)); err != nil {
+	// Remove duplicates
+	uniqueIps := r.uniqueIps(providerIps)
+
+	if err := r.patchStatus(ctx, provider, r.patchProviderIp(strings.Join(uniqueIps, ", "))); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -117,6 +121,21 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 // =================================================== PRIVATE FUNCTIONS ===================================================
+
+// uniqueIps will remove duplicates from a list of IPs
+func (r *ProviderReconciler) uniqueIps(ips []string) []string {
+	uniqueIps := []string{}
+	ipMap := make(map[string]bool)
+
+	for _, ip := range ips {
+		if _, value := ipMap[ip]; !value {
+			ipMap[ip] = true
+			uniqueIps = append(uniqueIps, ip)
+		}
+	}
+
+	return uniqueIps
+}
 
 // fetchSecret will fetch the secret from the namespace and set the status of the Provider
 // it will also update the status of the Provider so logic is isolated in this function

@@ -14,11 +14,11 @@ type MockClient struct {
 	GetIPInterceptor func()
 }
 
-func (c MockClient) GetIp() (string, error) {
+func (c MockClient) GetIp() ([]string, error) {
 	if c.GetIPInterceptor != nil {
 		c.GetIPInterceptor()
 	}
-	return c.IP, c.GetIPError
+	return []string{c.IP}, c.GetIPError
 }
 
 func (c MockClient) SetIp(ip string) error {

@@ -76,8 +76,10 @@ func (c CloudflareClient) SetIp(ip string) error {
 	return nil
 }
 
-// GetIp returns the public IP from the first zone that has a record
-func (c CloudflareClient) GetIp() (string, error) {
+// GetIp returns the public IP from all the zones
+func (c CloudflareClient) GetIp() ([]string, error) {
+	ips := make([]string, 0)
+
 	for _, zone := range c.Config.Cloudflare.Zones {
 		var (
 			ip  string
@@ -85,14 +87,13 @@ func (c CloudflareClient) GetIp() (string, error) {
 		)
 
 		if ip, err = c.getIpFromZone(zone); err != nil {
-			c.Logger.Error(err, "Error while getting IP from zone, will search in next", "zone", zone.Name)
-			continue
+			return nil, err
 		}
 
-		return ip, nil
+		ips = append(ips, ip)
 	}
 
-	return "", fmt.Errorf("error while trying to get IP from all zones")
+	return ips, nil
 }
 
 // getIpFromZone returns the public IP for a specific zone
