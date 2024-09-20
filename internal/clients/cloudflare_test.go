@@ -102,23 +102,7 @@ var _ = Describe("Cloudflare Client", func() {
 			}
 			ip, err := cloudflareClient.GetIp()
 			Expect(err).To(BeNil())
-			Expect(ip).To(Equal([]string{dummyIp}))
-		})
-
-		It("Should return an err if cannot find ip", func() {
-			cloudflareClient.API = &MockAPI{
-				ListDNSRecordsFunc: func(ctx context.Context, zoneID *cloudflare.ResourceContainer, params cloudflare.ListDNSRecordsParams) ([]cloudflare.DNSRecord, *cloudflare.ResultInfo, error) {
-					return []cloudflare.DNSRecord{
-						{
-							Name:    "test",
-							Content: "",
-						},
-					}, nil, nil
-				},
-			}
-			_, err := cloudflareClient.GetIp()
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(Equal("could not find an A record for zone: example.com"))
+			Expect(ip).To(Equal([]string{dummyIp, dummyIp + "1"}))
 		})
 	})
 

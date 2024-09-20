@@ -81,41 +81,37 @@ func (c CloudflareClient) GetIp() ([]string, error) {
 	ips := make([]string, 0)
 
 	for _, zone := range c.Config.Cloudflare.Zones {
-		var (
-			ip  string
-			err error
-		)
+		var err error
 
-		if ip, err = c.getIpFromZone(zone); err != nil {
+		if ips, err = c.getIpsFromZone(zone); err != nil {
 			return nil, err
 		}
-
-		ips = append(ips, ip)
 	}
 
 	return ips, nil
 }
 
-// getIpFromZone returns the public IP for a specific zone
-func (c CloudflareClient) getIpFromZone(zone Zone) (string, error) {
+// getIpFromZone returns the public IPs for a records in a specific zone
+func (c CloudflareClient) getIpsFromZone(zone Zone) ([]string, error) {
+	ips := make([]string, 0)
 	zoneID, err := c.API.ZoneIDByName(zone.Name)
 	if err != nil {
-		return "", err
+		return ips, err
 	}
 
 	records, _, err := c.API.ListDNSRecords(context.Background(), cloudflare.ZoneIdentifier(zoneID), cloudflare.ListDNSRecordsParams{})
 	if err != nil {
-		return "", err
+		return ips, err
 	}
 
 	for _, r := range records {
 		for _, zr := range zone.Records {
 			if r.Type == "A" && r.Name == zr.Name {
-				return r.Content, nil
+				ips = append(ips, r.Content)
 			}
 		}
 	}
-	return "", fmt.Errorf("could not find an A record for zone: %s", zone.Name)
+	return ips, nil
 }
 
 // setIpForZone sets the public ip for a specific zone
