@@ -59,8 +59,6 @@ type ProviderReconciler struct {
 
 // Reconcile will reconcile the Provider object
 func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
-
 	var (
 		err            error
 		providerClient clients.Client
@@ -79,7 +77,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	provider.Conditions().FillConditions()
 
-	if err := r.patchStatus(ctx, provider, r.patchPublicIp(publicIp)); err != nil {
+	if err = r.patchStatus(ctx, provider, r.patchPublicIp(publicIp)); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -99,7 +97,7 @@ func (r *ProviderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if provider.Status.PublicIP != provider.Status.ProviderIP {
-		log.Info("IPs desynced, updating provider IP")
+		log.FromContext(ctx).Info("IPs desynced, updating provider IP")
 
 		if err := providerClient.SetIp(provider.Status.PublicIP); err != nil {
 			return ctrl.Result{}, err
@@ -128,7 +126,7 @@ func (r *ProviderReconciler) uniqueIps(ips []string) []string {
 	ipMap := make(map[string]bool)
 
 	for _, ip := range ips {
-		if _, value := ipMap[ip]; !value {
+		if !ipMap[ip] {
 			ipMap[ip] = true
 			uniqueIps = append(uniqueIps, ip)
 		}
@@ -164,7 +162,7 @@ func (r *ProviderReconciler) fetchSecret(
 		)
 	}
 
-	conditions.PatchConditions(ctx, r.Client, provider, ddnsv1alpha1.ProviderConditionTypeSecret, condOptions...)
+	_ = conditions.PatchConditions(ctx, r.Client, provider, ddnsv1alpha1.ProviderConditionTypeSecret, condOptions...)
 
 	return secret, err
 }
@@ -194,7 +192,7 @@ func (r *ProviderReconciler) fetchConfig(
 		)
 	}
 
-	conditions.PatchConditions(ctx, r.Client, provider, ddnsv1alpha1.ProviderConditionTypeConfigMap, condOptions...)
+	_ = conditions.PatchConditions(ctx, r.Client, provider, ddnsv1alpha1.ProviderConditionTypeConfigMap, condOptions...)
 
 	return configMap, err
 }
@@ -229,7 +227,7 @@ func (r *ProviderReconciler) fetchClient(
 		)
 	}
 
-	conditions.PatchConditions(ctx, r.Client, provider, ddnsv1alpha1.ProviderConditionTypeClient, condOptions...)
+	_ = conditions.PatchConditions(ctx, r.Client, provider, ddnsv1alpha1.ProviderConditionTypeClient, condOptions...)
 
 	return providerClient, err
 }

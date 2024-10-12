@@ -58,7 +58,7 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	notifier.Conditions().FillConditions()
+	_ = notifier.Conditions().FillConditions()
 
 	notifierClient, err := r.fetchNotifier(ctx, req, notifier)
 	if err != nil {
@@ -66,7 +66,7 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	if !notifier.Status.IsReady {
-		if err := r.markAsReady(ctx, notifier, notifierClient); err != nil {
+		if err = r.markAsReady(ctx, notifier, notifierClient); err != nil {
 			return ctrl.Result{}, fmt.Errorf("unable to mark Notifier as ready: %w", err)
 		}
 
@@ -74,23 +74,17 @@ func (r *NotifierReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	providers := &ddnsv1alpha1.ProviderList{}
-	if err := r.List(ctx, providers); err != nil {
+	if err = r.List(ctx, providers); err != nil {
 		return ctrl.Result{}, fmt.Errorf("unable to list Providers: %w", err)
 	}
 
-	filteredProviders := []ddnsv1alpha1.Provider{}
 	for _, provider := range providers.Items {
 		for _, ref := range provider.Spec.NotifierRefs {
 			if ref.Name == req.Name {
-				filteredProviders = append(filteredProviders, provider)
-				break
+				if err = r.notifyOfChange(ctx, req, &provider, notifier, notifierClient); err != nil {
+					return ctrl.Result{}, fmt.Errorf("unable to notify of change: %w", err)
+				}
 			}
-		}
-	}
-
-	for _, provider := range filteredProviders {
-		if err = r.notifyOfChange(ctx, req, &provider, notifier, notifierClient); err != nil {
-			return ctrl.Result{}, fmt.Errorf("unable to notify of change: %w", err)
 		}
 	}
 
@@ -125,7 +119,7 @@ func (r *NotifierReconciler) markAsReady(
 		)
 	}
 
-	conditions.PatchConditions(ctx, r.Client, notifier, ddnsv1alpha1.NotifierConditionTypeClient, condOptions...)
+	_ = conditions.PatchConditions(ctx, r.Client, notifier, ddnsv1alpha1.NotifierConditionTypeClient, condOptions...)
 
 	if err != nil {
 		return fmt.Errorf("unable to send greetings: %w", err)
@@ -170,12 +164,6 @@ func (r *NotifierReconciler) notifyOfChange(
 		message = fmt.Sprintf("Provider IP (%s) out of sync with Public IP (%s). From provider: (%s).", provider.Status.ProviderIP, provider.Status.PublicIP, provider.Name)
 	}
 
-	patch := client.MergeFrom(provider.DeepCopy())
-	if provider.Annotations == nil {
-		provider.Annotations = make(map[string]string)
-	}
-	provider.Annotations[annotation] = provider.Status.ProviderIP
-
 	if err := notifierClient.SendNotification(message); err != nil {
 		log.Error(err, "unable to send notification")
 
@@ -183,22 +171,32 @@ func (r *NotifierReconciler) notifyOfChange(
 			log.Error(err, "unable to mark Notifier as not ready")
 		}
 
-		condOptions := []conditions.ConditionOption{
-			conditions.WithReasonAndMessage("ClientCommunication", fmt.Sprintf("unable to send notification: %s", err)),
+		conditions.PatchConditions(
+			ctx,
+			r.Client,
+			notifier,
+			ddnsv1alpha1.NotifierConditionTypeClient,
 			conditions.False(),
-		}
-
-		conditions.PatchConditions(ctx, r.Client, notifier, ddnsv1alpha1.NotifierConditionTypeClient, condOptions...)
+			conditions.WithReasonAndMessage("ClientCommunication", fmt.Sprintf("unable to send notification: %s", err)),
+		)
 
 		return err
 	}
 
-	condOptions := []conditions.ConditionOption{
+	conditions.PatchConditions(
+		ctx,
+		r.Client,
+		notifier,
+		ddnsv1alpha1.NotifierConditionTypeClient,
 		conditions.WithReasonAndMessage("ClientCommunication", "Notification sent"),
 		conditions.True(),
-	}
+	)
 
-	conditions.PatchConditions(ctx, r.Client, notifier, ddnsv1alpha1.NotifierConditionTypeClient, condOptions...)
+	patch := client.MergeFrom(provider.DeepCopy())
+	if provider.Annotations == nil {
+		provider.Annotations = make(map[string]string)
+	}
+	provider.Annotations[annotation] = provider.Status.ProviderIP
 
 	if err := r.Patch(ctx, provider, patch); err != nil {
 		return err
