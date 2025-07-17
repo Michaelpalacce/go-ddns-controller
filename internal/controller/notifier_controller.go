@@ -109,12 +109,12 @@ func (r *NotifierReconciler) markAsReady(
 	if err = notifierClient.SendGreetings(notifier); err != nil {
 		message := fmt.Sprintf("unable to send greetings: %s", err)
 		condOptions = append(condOptions,
-			conditions.WithReasonAndMessage("ClientCommunication", message),
+			conditions.WithReasonAndMessage("Communication", message),
 			conditions.False(),
 		)
 	} else {
 		condOptions = append(condOptions,
-			conditions.WithReasonAndMessage("ClientCommunication", "Communications established"),
+			conditions.WithReasonAndMessage("Communication", "Communications established"),
 			conditions.True(),
 		)
 	}
@@ -205,6 +205,9 @@ func (r *NotifierReconciler) notifyOfChange(
 	return nil
 }
 
+// fetchNotifier is responsible for creating a new notifier using the r.NotifierFactory and providing the
+// configuration from a ConfigMap defined in `configMap` and Secret defined in `secretName` in the spec stanza
+// Also sets conditions appropriately
 func (r *NotifierReconciler) fetchNotifier(
 	ctx context.Context,
 	req ctrl.Request,
